@@ -1,0 +1,24 @@
+The following is a description for each file:
+
+rhd_bfw.dat --- Bottom freshwater inputs, unused
+rhd_cor.dat --- coriolis force, a list of latitude, used
+rhd_dep.dat --- bathymetry definition file, used
+rhd_el_ini.dat --- initial sea surface height, set at 0.0, used
+rhd_elj_obc.dat --- time series of open boundary SSH, used
+rhd_flux_map.dat --- map of coordinates to calculate a flux across the TCEs, optional
+rhd_grd.dat --- grid geometry definition file, used
+rhd_hfx.dat --- non-uniform heat flux forcing file, optional (currently unused)
+rhd_its.dat --- initial temperature and salinity file when starting from cold, optional (currently starting hot)
+rhd_kelp_map.dat --- map of water column marsh plant properties, optional (currently used)
+rhd_mc.dat --- uniform meteorological forcing for precip,evap,wind speed,wind direction, long wave rad, short wave rad (used)
+rhd_mc_air.dat --- uniform meteorological forcing for heat flux, temperature, relative humidity, pressure,downward long wave rad, downward short wave rad, net short wave rad, net long wave rad  (used)
+rhd_obc.dat --- open boundary definition file (used)
+rhd_restart.dat --- restart file for water column (used)
+rhd_restart_wd.dat --- restart file for wetting and drying (used)
+rhd_riv.dat --- River forcing file (used)
+rhd_spg.dat --- open boundary sponge layer file (used)
+rhd_sst.dat --- nudging file (not used)
+rhd_tsobc.dat --- open boundary time series for temperature and salinity (used)
+rhd_uv_ini.dat --- initial velocity field, set to 0.0 (used)
+rhd_wnd.dat --- non-uniform wind forcing file, optional (currently unused)
+rhd_wnd_blk.dat --- wind block file, optional (currently unused)

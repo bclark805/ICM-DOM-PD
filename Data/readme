@@ -1,0 +1,23 @@
+This *.mat files contained within this directory are used by
+
+various scripts to compute and process the ICM-DOM-PD model output
+
+to generate a Carbon budget and other results from Clark et al., 
+
+"A comprehensive estuarine carbon budget and the importance of tidal marshes in estuarine biogeochemistry"
+
+The OutputData directory contains 4 sub-directories 
+
+that each have matlab data structures that contain the carbon and nitrogen budget terms
+
+for the Rhode River, MD
+
+in addition, outputs for the difference between the model runs with and without the marsh
+
+are contained in OutputData
+
+The scripts in the Postprocessing directory were primarily used to generate the matlab data structures
+
+Please contact B Clark at bclark@umces.edu with any questions
+
+

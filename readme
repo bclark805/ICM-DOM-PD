@@ -1,0 +1,50 @@
+This Repository contains all of the source code, inputs, and postprocessing
+
+to run the FVCOM hydrodynamics and ICM-DOM-PD water quality model for the 
+
+Rhode River, MD, USA contained within the mesohaline region of Chesapeake Bay
+
+for April 1- Nov 30, 2005.
+
+***** This has been tested and run on multiple Linux OS's with 
+Intel Parallel Studio 2017 compilers which are complimentary for academic use *****
+
++----------------------------------------------------------------------------------+
+
+First, the FVCOM model must be run for the entire year (or atleast April 1-Nov 30) to get the forcing to drive
+
+next, the wqm_linkage.in file in the Water_Quality directory can be modified to point to where the FVCOM outputs reside
+
+the offline-coupled ICM-DOM-PD.
+
+
+1.  Install METIS and netcdf which are both contained in the software directory (directions contained within)
+
+2.  Modify the makefile in the FVCOM source code directory to point towards the METIS and netcdf libraries
+
+3.  compile FVCOM by typing "make clean"  , followed by "make"
+
+4.  Run FVCOM for an entire year, modifying the rhd_run.dat file as desired
+	- specify the output directory in the rhd_run.dat file
+	- a common command line prompt is: mpiexec -n np executable 
+		-where np is the number of processors and executable is the executable generated from building the source code
+
+5.  Use FVCOM to drive the water quality model linking with wqm_linkage.in
+
+	- use a similar command as above changing the executable to the ICM-DOM-PD 
+
+6.  Post-process RhodeFVCOM-ICM model outputs to generate carbon budgets
+
+7.  Enjoy
+
+
+Disclaimer:
+The use of this modeling system is for research purposes only. The software developers and authors are not responsible
+
+for any damages that could possibly arise from is use. The developers of this model are not responsible for any undesired outcomes produced by this model.
+ 
+Contact Blake Clark for any specific questions
+
+bclark@umces.edu
+
+

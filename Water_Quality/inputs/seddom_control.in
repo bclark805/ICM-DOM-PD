@@ -1,0 +1,48 @@
+this is the sediment dom input control file.  The parameters contained here control the sediment diageetic reactions of DOM 
+as well as diffusion to the overlying water column.  The formatting must remain the same, for the time being.
+
+
+SED_DOM calculation flag (.TRUE. if on)
+SED_DOM
+TRUE
+
+
+
+
+Hydrolysis of POC --> DOC calculation flag (.TRUE. if on)
+HYDRO_FLAG
+TRUE
+
+DOC CONTROL PARAMETERS for Temperature Dependence
+thetaDOC1   thetaDOC2   thetaDOC3   
+1.1000      1.1500       1.2000
+DOC CONTROL PARAMETERS for base Reaction rate (1/day)
+KDOC1       KDOC2        KDOC3
+0.3500      0.0300       0.000      
+DON CONTROL PARAMETERS for Temperature Dependence
+thetaDON1   thetaDON2   thetaDON3
+1.1000      1.1500       1.2000
+DOC CONTROL PARAMETERS for base Reaction rate (1/day)
+KDON1       KDON2        KDON3
+0.400       0.0300       0.000       
+DOP CONTROL PARAMETERS for Temperature Dependence
+thetaDOP1   thetaDOP2   thetaDOP3
+1.1000      1.1500       1.2000
+DOP CONTROL PARAMETERS for base Reaction Rate (1/day)
+KDOP1       KDOP2        KDOP3
+0.4000      0.0300       0.000
+ORGANIC CARBON GENERATION FRACTIONS ! we need to find the actually fractions for the marsh
+MFDOC1      MFDOC2       MFDOC3
+0.050       0.0500       0.9000
+STOICHIOMETRIC RATIOS !!!(MASS RATIOS!!!) for input from the marsh
+CtoN        CtoP
+0.100     0.0142        !0.08333  0.0125
+FRACTIONATION TO COLORED AND NONCOLORED PORTIONS
+NCDOCFRAC   CDOCFRAC
+0.2000      0.8000
+DOM diffusion Rate, m^2/day
+DOM_diff  DOM_TCON
+0.0001         1.0000
+Fraction of HYDROLYSIS POC to colored parts
+POCCF1  POCCF2  POCCF3
+0.3000      0.3000       0.3000

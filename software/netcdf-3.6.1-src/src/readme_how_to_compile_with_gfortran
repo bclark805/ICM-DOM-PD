@@ -1,0 +1,24 @@
+export CC=gcc
+export FC=gfortran
+export FCFLAGS="-fno-underscoring"
+
+./configure --prefix=/people/long075/fvcom-ltrans/netcdf_install_gfortran #replace the folder name here to your fvcom-ltrans
+
+make clean
+make distclean
+make
+
+#if above make runs into problems with typesizes, do the following
+
+cd f90 
+gfortran -c typeSizes.f90
+cd ..
+make 
+#----------------
+
+mkdir ../../netcdf_install_gfortran
+make install 
+
+
+#Wen Long, may 13/2014
+

@@ -1,0 +1,9 @@
+Mock up of settling rates file in m/d                    
+Created 15 August 2000, JLM ERDC WES; Modified 12-19-02 dht             !settling in water column (same as the BFI file, sediment diagnesis)
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+     BOX     WSS   WSLAB   WSREF     WS1     WS2     WS3     WSU        
+       1   1.500   0.500   0.500   0.100   0.100   0.100   0.100
+

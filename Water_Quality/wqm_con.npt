@@ -1,0 +1,291 @@
+                                Control file for WQM
+
+
+TITLE C ................................TITLE...................................
+Example of a Channel - uniform BC, 
+Set up for COLD START !
+
+
+This version is used for the Rhode River marsh-estuary interaction
+
+
+GEOM DEFINE  MGL     NGL      KB   NOBTY  !*** (MGL = Number of nodes, NGL = Number of Elements, and NOBTY = number of open boundaries) 
+           8138    14572      11      53   
+
+TIME CON  TMSTRT   TMEND  YRSTRT     DTI  !*** (DTI = model timestep set same as DLTVAL and DLTMAX below)
+          0.000    242.    2005    120.0 
+
+# DLT       NDLT   #number of time step sizes to use (always ==1)
+               1
+
+DLT DAY     DLTD    DLTD    DLTD    DLTD    DLTD    DLTD    DLTD    DLTD    DLTD  #the time when time step size changes (always zero)
+             0.0
+
+DLT VAL   DLTVAL  DLTVAL  DLTVAL  DLTVAL  DLTVAL  DLTVAL  DLTVAL  DLTVAL  DLTVAL ***  #time step in the model simulation (20 sec)
+             120.
+
+DLT MAX   DLTMAX  DLTMAX  DLTMAX  DLTMAX  DLTMAX  DLTMAX  DLTMAX  DLTMAX  DLTMAX ***  #maximum time step used in model (always equal to DLTVAL above )
+             120.
+
+DLT FTN   DLTFTN  DLTFTN  DLTFTN  DLTFTN  DLTFTN  DLTFTN  DLTFTN  DLTFTN  DLTFTN *** not used any more (still a place holder here)
+            
+
+HM DLT    AHMDLT  FILGTH !*** (AMHDLT = hydrodynamic model file record update interval in netcdf files, FILGTH maximum ending date 730 julian days - 2-year)
+          3600.0   730.0
+
+SNAPSHOT    SNPC    NSNP  !snapshot outptus in time (not used anymore)
+              ON       3
+  
+SNAP DAY    SNPD    SNPD    SNPD    SNPD    SNPD    SNPD    SNPD    SNPD    SNPD  # starting date of the snapshot output
+             0.0
+
+SNAP FRQ    SNPF    SNPF    SNPF    SNPF    SNPF    SNPF    SNPF    SNPF    SNPF  #freqency (time interval (days)) of snapshot outputs
+            30.0    60.0    90.0   365.0
+
+PLOT        PLTC   QPLTC   SPLTC SAVPLTC    NPLT                                  #old plotting output (not used anymore)
+              ON      ON      ON     OFF       1
+
+PLOT DAY    PLTD    PLTD    PLTD    PLTD    PLTD    PLTD    PLTD    PLTD    PLTD  #starting dates of plot outouts
+             0.5    90.0   120.0
+
+PLOT FREQ   PLTF    PLTF    PLTF    PLTF    PLTF    PLTF    PLTF    PLTF    PLTF  #plotting frequency (intervals (days))
+             1.0    30.4
+
+AV PLOT    APLTC    NAPL						#time average plt, NAPL is number of times (dates) to plot time average
+              ON       1
+
+AVPLT DAY  APLTD   APLTD   APLTD   APLTD   APLTD   APLTD   APLTD   APLTD   APLTD   #also dates
+             0.0    30.0    60.0    90.0   120.0   150.0   180.0
+             
+AVPLT FREQ  APLF    APLF    APLF    APLF    APLF    APLF    APLF    APLF    APLF   #frequency
+             1.0    30.0    30.0    30.0   365.0   365.0   365.0   365.0
+
+TRAN FLUX   TFLC    NTFL							#tracer flux plot
+              ON       1
+
+FLUX DAY    TFLD    TFLD    TFLD    TFLD    TFLD    TFLD    TFLD    TFLD    TFLD
+              0.
+
+FLUX FREQ   TFLF    TFLF    TFLF    TFLF    TFLF    TFLF    TFLF    TFLF    TFLF
+            30.4
+
+KIN FLUX    KFLC    NKFL							#kinetics flux plot (basically reaction terms for a constituent)
+              ON       1
+
+FLUX DAY    KFLD    KFLD    KFLD    KFLD    KFLD    KFLD    KFLD    KFLD    KFLD	
+              0.    90.0   120.0
+
+FLUX FREQ   KFLF    KFLF    KFLF    KFLF    KFLF    KFLF    KFLF    KFLF    KFLF
+            30.4  0.0417     1.0
+
+OXY PLOT    OPLC    NOPL   NOINT						#oxygen plots
+             OFF       1       8
+
+OXY INT     OINT    OINT    OINT    OINT    OINT    OINT    OINT    OINT    OINT
+            -1.0     1.0     2.0     3.0     4.0     5.0     8.0    16.0
+
+OXY DAY     OPLD    OPLD    OPLD    OPLD    OPLD    OPLD    OPLD    OPLD    OPLD
+              1.
+
+OXY FREQ    OPLF    OPLF    OPLF    OPLF    OPLF    OPLF    OPLF    OPLF    OPLF
+              5.
+
+MASS BAL    MBLC    NMBL							#mass balance outputs 
+             OFF       1
+
+MBL DAY     MBLD    MBLD    MBLD    MBLD    MBLD    MBLD    MBLD    MBLD    MBLD
+             0.0
+
+MBL FREQ    MBLF    MBLF    MBLF    MBLF    MBLF    MBLF    MBLF    MBLF    MBLF
+              1.
+
+DIAGNSTCS   DIAC    NDIA							#diagnostic outputs
+              ON       1
+
+DIA DAY     DIAD    DIAD    DIAD    DIAD    DIAD    DIAD    DIAD    DIAD    DIAD
+               0.
+
+DIA FREQ    DIAF    DIAF    DIAF    DIAF    DIAF    DIAF    DIAF    DIAF    DIAF
+            30.0
+
+RESTART     RSOC    NRSO    RSIC ***						#RSOC on will give an output for restart, NRSO gives number of restart files to output, RSIC, means to read from a restart file as initial condition (off, not tested, does not work yet)
+              ON       9     OFF
+
+RST DAY     RSOD    RSOD    RSOD    RSOD    RSOD    RSOD    RSOD    RSOD    RSOD ***  #dates to write lrestart file
+             40.     60.    100.    140.    180.    220.    260.    300.    340.
+
+HYD SOLTN    SLC   CONSC      TH MINSTEP					#method to calculate hydrodynamics (obsoltete) (old ICM can calculate flow)
+        QUICKEST    MASS     1.0    10.0
+
+CONTROLS    SEDC   AUTOC     VBC    BFOC    STLC    ICIC    ICOC   SAVMC    BAOC #flag for sediment diagenesis, ( only care about SEDC, ICIC, SAVMC, BAOC)
+              ON      ON      ON      ON      ON UNIFORM      ON     OFF     OFF
+
+CONTROLS    SFLC    DFLC  SFLOXC  DFLOXC    BALC    DFOC			#surface flux as forcing , and BALC (not sure), 
+             OFF     OFF      ON     OFF     OFF     OFF
+
+DEAD SEA     FLC   XYDFC    ZDFC						#this is a dead-sea case built in (obsolete) 
+              ON      ON      ON
+
+HDIFF       XYDF  ZDFMUL  ZDFBCK  ZDFMAX					#horizontal diffusion and vertical diffusio used in old ICM (obsolete) flow calculation
+             1.0     1.0  1E-6   0.1
+
+HDIFFTYPE  XYDFU								#horizontal diffusion
+              ON
+	       
+CST INPUT    BCC     S1C     S2C     S3C     MDC     BFC    ATMC   SAVLC	#not sure
+             OFF     OFF     OFF     OFF     OFF     OFF     OFF     OFF
+
+NUTR RED  REDS1C  REDS1N  REDS1P  REDS2C  REDS2N  REDS2P  REDS3C  REDS3N  REDS3P #not sure
+             1.0     1.0     1.0     1.0     1.0     1.0     1.0     1.0     1.0	
+
+NUTR RED  REDCBC  REDCBN  REDCBP  
+             1.0     1.0     1.0  
+
+BOUNDARY   BNDTC
+          INTERP
+
+ACT CST      ACC     ACC     ACC     ACC     ACC     ACC     ACC     ACC     ACC  #ACC means the activiation of 44 constituents in water column, so far only 19 on and tested 
+             OFF     OFF      ON      ON      ON     OFF     OFF     OFF      ON
+              ON      ON      ON      ON      ON      ON      ON      ON      ON
+              ON      ON      ON      ON      ON      ON      ON      ON      ON
+             OFF     OFF     OFF     OFF     OFF      ON      ON      ON      ON
+       	      ON      ON      ON      ON      ON      ON      ON      ON                                                                                                   
+     
+# FILES    NHYDF   NTVDF
+               4       4                                                           
+
+MAP FILE................................MAPFN.....(UNUSED)......................obsolete (old icm mapping, now we only use fvcom grid from netcdf)
+        inputs/icm_map_file.npt
+
+GEO FILE................................GEOFN...................................obsolete
+        inputs/icm_geo_file.npt 
+
+ICI FILE................................ICIFN.....(USED)...***..........................
+        inputs/rhd_initial_wq_vert_restart1.dat
+
+RSI FILE................................RSIFN...................................if RSIC=ON this will be used as input (restart from previous run, not tested)
+        inputs/restart.242
+
+AGR FILE................................AGRFN.....(USED)...***..................USED --- algae growth parameters
+        inputs/wqm_algae.3_yr_7
+
+ZOO FILE................................ZOOFN.....(UNUSED)..............................so far not used, ZOOP growth parameters (ACC for zoop is OFF)
+        inputs/zooplankton.npt   NOT USED
+
+SFI FILE................................SFIFN.....(UNUSED)..............................NOT used (not tested)
+        inputs/susp_feeder.npt   NOT USED
+
+STL FILE................................STLFN.....(USED)...***..........................USED -- settling rates of particulates 
+        inputs/settling.10_yr_3
+
+MRL FILE................................MRLFN.....(USED)...***..........................USED -- remineralization rates of dead stuff
+        inputs/mineralization_newDOM.3_yr_8
+
+EXT FILE................................EXTFN.....(USED)...***...........................USED-- light extinction coefficient (related to Kd and color!!!)
+        inputs/wqm_kei_photoDEG_v8_1.csv   
+       ! inputs/wqm_kei_102003.npt
+MET FILE................................METFN.....(USED)...***...........................USED-- meteorology that contains shortwave radiation and wind etc (only using SWRAD for light)
+        inputs/RR_newPD_meteorlogical2.dat
+        inputs/meteorologic_fullgrid.npt
+        inputs/meteorologic_fullgrid.npt
+        inputs/meteorologic_fullgrid.npt
+
+S1  FILE................................S1FN......(UNUSED)..............................source files for external loading of stuff (such as waste water treatment plant effluent)
+        inputs/s1_load.npt   NOT USED
+        inputs/s1_load.npt
+        inputs/s1_load.npt
+        inputs/s1_load.npt
+
+S2  FILE................................S2FN......(UNUSED)..............................
+        inputs/s2_load.npt   NOT USED
+        inputs/s2_load.npt
+        inputs/s1_load.npt
+        inputs/s1_load.npt
+
+S3  FILE................................S3FN......(UNUSED)..............................
+        inputs/s3_load.npt   NOT USED
+        inputs/s3_load.npt
+        inputs/s1_load.npt
+        inputs/s1_load.npt
+
+ATM FILE................................ATMFN.....(UNUSED)..............................atmospheric deposition conditions (NOT USED)
+        inputs/atmospheric.npt   NOT USED
+        inputs/atmospheric.npt
+        inputs/s1_load.npt
+        inputs/s1_load.npt
+
+SVI FILE................................SAVFN.....(UNUSED).............................SAV input file (not tested)
+        inputs/sav.npt   NOT USED
+        inputs/sav.npt
+        inputs/sav.npt
+        inputs/sav.npt
+
+BFI FILE................................BFIFN.....(USED)....***........................sediment diagnesis input file (USED)
+        inputs/rhd_seddiag_2b.npt
+        inputs/rhd_seddiag_2b.npt
+        inputs/rhd_seddiag_2b.npt
+        inputs/rhd_seddiag_2b.npt
+
+CBC FILE................................CBCFN......(UNUSED)............................concenntration boundary file (not USED)
+        inputs/wqm_cbc.w_iss
+        inputs/wqm_cbc.w_iss
+        inputs/wqm_cbc.w_iss
+        inputs/wqm_cbc.w_iss
+
+BAI FILE................................BAIFN.....(USED)..............................benthic algae (not tested)
+        inputs/bai_chn.npt
+
+DFI FILE................................DFIFN.....(USED)..............................deposition feeder (not tested)
+        inputs/dfi_chn.npt
+ 
+ICO FILE................................ICOFN................................... (USED, initial conditions output for subsequent runs)
+        outputs/initial_conditions.3_yr_11
+
+SNP FILE................................SNPFN................................... snapshot outputs (not used)
+        outputs/snapshot.3_yr_11
+        
+RSO FILE................................RSOFN................................... output as restart file but not tested
+        outputs/restart.3_yr_11
+
+PLT FILE................................PLTFN...................................
+        outputs/plot.3_yr_11
+
+APL FILE................................APLFN...................................
+        outputs/avg_plot.3_yr_11
+
+DIA FILE................................DIAFN...................................
+        outputs/diagnostics.3_yr_11
+
+TFL FILE................................TFLFN...................................
+        outputs/transport_flux.3_yr_11
+
+KFL FILE................................KFLFN...................................
+        outputs/kinetics.3_yr_11
+
+OPL FILE................................OPLFN...................................
+        outputs/oxygen_plot.3_yr_11
+
+MBL FILE................................MBLFN...................................
+        outputs/mass_balance.3_yr_11
+
+ALO FILE................................ALOFN...................................
+        outputs/algae.3_yr_11
+
+ZFO FILE................................ZFOFN...................................
+        outputs/zooplankton.3_yr_11
+
+BFO FILE................................BFOFN...................................
+        outputs/benthic_flux.3_yr_11
+
+SVO FILE................................SVOFN...................................
+        outputs/sav.dat
+
+SFO FILE................................SFOFN...................................
+        outputs/suspension_feeders.dat
+
+BAO FILE................................BAOFN...................................
+        outputs/benthicalgae_output.dat
+
+DFO FILE................................DFOFN...................................
+        outputs/depositionfeeder_output.dat
+

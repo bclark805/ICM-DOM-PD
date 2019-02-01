@@ -1,0 +1,28 @@
+This directory contains all of the scripts required to post-process the RhodeFVCOM-ICM model output
+
+to generate the organic carbon budget and model-data comparison results in Clark et al., 
+(A comprehensive estuarine organic carbon budget and the impact of tidal marshes on estuarine biogeochemisty)
+
+Required is a version of MATLAB R2017 or later
+
+the mexcdf tool box
+
+and a few scripts and functions. Additional toolboxes may be necessary and can be downloaded from the MATLAB website
+
+
+1. Run wqmhis2matlab_budget to produce *.mat files that have the internally integrated budget terms (right hand side of equation)
+	a. Follow the Prompts within
+
+2. Run Carbon_budget_ncdf.m 
+	a. Follow the Prompts within
+
+3. Run compare_WQM_data_CBAY_ncdf.,
+	a. Follow the prompts within
+	b. This script requires Chesapeake Bay Program data that has been
+	   sorted into a data structure using the Read_CBP.m script
+	
+
+B Clark
+UMCES, HPL
+January, 2019
+

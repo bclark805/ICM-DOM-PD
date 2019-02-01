@@ -1,0 +1,123 @@
+Following Cerco and Noel (2017) for most up-to-date parameterization
+B Clark March, 2018
+Rhode River Model Domain
+HALF SAT   KHONT   KHNNT  KHOCOD  KHODOC   KHNDN                      !half constants for nitrification, defrification etc)  
+           0.100    0.01   0.100  0.100     0.01 
+                                             ! make KHNDN zero so there is no limitation "denitrificatin"  will still take place withouth NO3 and will also reset No3 to zero if go negative in adv_wqm                           
+RATIOS      AOCR    AONT  KHCOAG                                       !Oxygen to Carbion Ratio  Oxygen to Nitrogen ratio, coagulation etc (KHCOAG)
+            2.67    4.33     2.0
+                                                                        
+REF T RESP TRCOD   TRMNL   TRHDR   TRSUA                                !reference temperature for temperature dependency (theta)^(Temp-TR), TR is reference temperature
+            23.0    20.0    20.0    20.0
+                                                                        
+TEMP EFF   KTCOD   KTMNL   KTHDR   KTSUA                                
+           0.041   0.069   0.069   0.092
+old                0.069   0.069                                        
+NITRIF T   KTNT1   KTNT2    TMNT  !TMNT WAS 30                                        
+          0.0030  0.0030    30.0
+old       0.0045  0.0045                                                
+SORPTION  KADPO4   KADSA                                                
+          0.0004   0.001
+                                                                        
+MISC       AANOX    ANDC                                                
+             0.9    .933
+old          0.5
+REAER      AREAR   BREAR   CREAR                                        
+           0.080     1.0     1.5
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KLPC    KLPC    KLPC    KLPC    KLPC    KLPC    KLPC    KLPC
+          0.0300
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KRPC    KRPC    KRPC    KRPC    KRPC    KRPC    KRPC    KRPC
+          0.0060
+
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KLPN    KLPN    KLPN    KLPN    KLPN    KLPN    KLPN    KLPN
+          0.0300
+         
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KRPN    KRPN    KRPN    KRPN    KRPN    KRPN    KRPN    KRPN
+          0.0060
+
+         SPVARM  PRINTM                                                 
+        CONSTANT      NO
+                                                                        
+            KLPP    KLPP    KLPP    KLPP    KLPP    KLPP    KLPP    KLPP
+          0.1500
+                                                                      
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KRPP    KRPP    KRPP    KRPP    KRPP    KRPP    KRPP    KRPP
+          0.0060
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KSUA    KSUA    KSUA    KSUA    KSUA    KSUA    KSUA    KSUA
+          0.0300
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+            KCOD    KCOD    KCOD    KCOD    KCOD    KCOD    KCOD    KCOD
+            20.0
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+          KDCALG  KDCALG  KDCALG  KDCALG  KDCALG  KDCALG  KDCALG  KDCALG
+          0.0000   
+          ! KDCALG scales remineralization to algal biomass but we want constant                                                              
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+          KLCALG  KLCALG  KLCALG  KLCALG  KLCALG  KLCALG  KLCALG  KLCALG
+          0.0000
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+          KRCOAG  KRCOAG  KRCOAG  KRCOAG  KRCOAG  KRCOAG  KRCOAG  KRCOAG
+          0.0000
+old       0.0500                                                        
+           SPVARM  PRINTM                                               
+        CONSTANT      NO
+                                                                        
+          KDNALG  KDNALG  KDNALG  KDNALG  KDNALG  KDNALG  KDNALG  KDNALG
+          0.0000
+          ! KDNALG scales remineralization to algal biomass but we want constant                                                              
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+          KLNALG  KLNALG  KLNALG  KLNALG  KLNALG  KLNALG  KLNALG  KLNALG
+          0.0000
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+          KDPALG  KDPALG  KDPALG  KDPALG  KDPALG  KDPALG  KDPALG  KDPALG
+          0.4000
+                                                                        
+          SPVARM  PRINTM                                                
+        CONSTANT      NO
+                                                                        
+          KLPALG  KLPALG  KLPALG  KLPALG  KLPALG  KLPALG  KLPALG  KLPALG
+          0.0000
+            ! This actually scales based on alage, see Cerco and Noelle 2017                                                            
+           SPVARM  PRINTM                                               
+        CONSTANT      NO
+                                                                        
+           NTMAX   NTMAX   NTMAX   NTMAX   NTMAX   NTMAX   NTMAX   NTMAX !maximum nitrification)
+          0.2000
+old       0.4000

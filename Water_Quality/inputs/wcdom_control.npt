@@ -1,0 +1,156 @@
+
+
+
+Flag for DOC photodegration
+True is on, false is off
+TRUE
+
+DOC reaction rates
+KDOC1_in  KDOC2_in  KDOC3_in
+  0.0500  0.0350  0.0010
+
+DON Reaction Rates   
+KDON1_in KDON2_in KDON3_in
+  0.0500  0.0350  0.0010      
+
+DOP Reaction Rates      
+  KDOP1_in    KDOP2_in  KDOP3_in
+  0.0500  0.0350  0.0010 
+
+Algal Half Saturation Constants relating to Oxygen limitation of Respiration
+   KHR1        KHR2         KHR3
+   0.1000  0.1000   0.1000
+
+Fraction of algae 1 to CDOC 1,2 and 3  5 % to refractory, 55% to semi-labile 40% to Labile after keller and hood 2011
+  FCD11       FCD12        FCD13     
+   0.1000  0.1000   0.0500
+
+Fraction of algae 2 to CDOC 1,2 and 3  1 % Dinoflagellates make more humics, up the fraction to CDOM3 for algae 2 to 4%, Romero-Castillo et al 2010 L & O
+  FCD21       FCD22        FCD23     
+   0.1000  0.1000   0.0500
+
+Fraction of algae 1 to NCDOC 1,2 and 3
+  FNCD11       FNCD12      FNCD13     
+   0.3000  0.4500   0.0000
+
+Fraction of algae 2 to NCDOC 1,2 and 3
+  FNCD21       FNCD22      FNCD23     
+   0.3000  0.4500   0.0000
+
+Fraction of algae 1 to CDON 1,2 and 3 
+  FCND11       FCND12      FCND13     
+   0.1000  0.1000   0.0500
+
+Fraction of algae 2 to CDON 1,2 and 3
+  FCND21       FCND22      FCND23     
+   0.1000  0.1000   0.0500
+
+Fraction of algae 1 to NCDON 1,2 and 3
+  FNCND11      FNCND12     FNCND13     
+   0.3000  0.4500   0.0000
+
+Fraction of algae 2 to NCDON 1,2 and 3
+  FNCND21      FNCND22     FNCND23     
+   0.3000  0.4500   0.0000
+
+Fraction of algae 1 to CDOP 1,2 and 3 
+  FCPD11       FCPD12      FCPD13     
+   0.2000  0.0500   0.0000
+
+Fraction of algae 2 to CDOP 1,2 and 3
+  FCPD21       FCPD22      FCPD23     
+   0.2000  0.0500   0.0000
+
+Fraction of algae 1 to NCDOP 1,2 and 3
+  FNCPD11      FNCPD12     FNCPD13     
+   0.6000  0.1500   0.0000
+
+Fraction of algae 2 to NCDOP 1,2 and 3
+  FNCPD21      FNCPD22     FNCPD23     
+   0.6000  0.1500   0.0000
+
+Fraction of algal 1 and 2 Carbon production that is Dissolved FCDx + FCLPx + FCRPx < 1, other parameters in algae input( fraction that is particulate)
+    FCD1        FCD2   ! Baines and Pace 1991 
+   0.1000  0.1000
+
+Fraction of algal 1 and 2 nitrogen production that is Dissolved FCDx + FCLPx + FCRPx < 1, other parameters in algae input( fraction that is particulate)
+    FND1        FND2     ! Bronk et al., 1994  was ~50 %  (but probably highy labile compounds) baines and Pace is 10 %
+   0.1000  0.1000
+
+Fraction of algal 1 and 2 phosphorus production that is Dissolved FCDx + FCLPx + FCRPx < 1, other parameters in algae input( fraction that is particulate)
+    FPD1        FPD2   
+   0.0000  0.0000
+
+Fraction of POC hydolysis that is CDOM1,2,3, sort of after Keller and Hood 2011, but other studies have found bacterial production of colored substances including humics
+  FHDRC1       FHDRC2      FHDRC3
+  0.1500   0.2000   0.0250
+
+Fraction of POC hydolysis that is NCDOM1,2,3
+  FHDRNC1      FHDRNC2     FHDRNC3
+  0.2000   0.4000   0.025
+
+Fraction of PON hydolysis that is CDOM1,2,3
+  FHDRCN1      FHDRCN2     FHDRCN3
+  0.1500   0.2000   0.0250
+
+Fraction of PON hydolysis that is NCDOM1,2,3
+  FHDRNCN1     FHDRNCN2    FHDRNCN3
+  0.2000   0.4000   0.0250
+
+Fraction of POP hydolysis that is CDOM1,2,3
+  FHDRCP1      FHDRCP2     FHDRCP3
+  0.1500   0.2000   0.0250
+
+Fraction of POP hydolysis that is NCDOM1,2,3
+  FHDRNCP1     FHDRNCP2    FHDRNCP3
+  0.2000   0.4000   0.0250
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011, currently no refractory zooplankton production
+  FDOC1SZ      FDOC2SZ     FDOC3SZ
+  0.4000   0.5900   0.0100
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011
+  FDOC1LZ      FDOC2LZ     FDOC3LZ
+  0.4000   0.5900   0.0100
+
+Fraction of Zooplankton production that is colored, sort of after Steinberg et al 2004 MEPS, each must be less than 1 
+  FCDOC1SZ     FCDOC2SZ    FCDOC3SZ
+  0.5000   0.5000   0.500
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011
+  FCDOC1LZ     FCDOC2LZ    FCDOC3LZ
+  0.5000   0.5000   0.5000
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011, currently no refractory zooplankton production
+  FDON1SZ      FDOC2SZ     FDOC3SZ
+  0.4000   0.5900   0.0100
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011
+  FDON1LZ      FDON2LZ     FDON3LZ
+  0.4000   0.5900   0.0100
+
+Fraction of Zooplankton production that is colored, sort of after Steinberg et al 2004 MEPS, each must be less than 1 
+  FCDON1SZ     FCDON2SZ    FCDON3SZ
+  0.5000   0.5000   0.5000
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011
+  FCDON1LZ     FCDON2LZ   FCDON3LZ
+  0.5000   0.5000   0.5000
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011, currently no refractory zooplankton production
+  FDOP1SZ      FDOP2SZ     FDOP3SZ
+  0.4000   0.5900   0.0100
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011
+  FDOP1LZ      FDOP2LZ     FDOP3LZ
+  0.4000   0.5900   0.0100
+
+Fraction of Zooplankton production that is colored, sort of after Steinberg et al 2004 MEPS, each must be less than 1 
+  FCDOP1SZ     FCDOP2SZ    FCDOP3SZ
+  0.5000   0.5000   0.500
+
+Fraction of Zooplankton production that is DOM 1,2 or 3 after Keller and Hood 2011
+  FCDOP1LZ     FCDOP2LZ   FCDOP3LZ
+  0.5000   0.5000   0.5000
+
+

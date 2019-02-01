@@ -1,0 +1,105 @@
+BENTHIC FLUX INPUT for Finite Volume Water Quality Model -- channel example           This is sediment diagenesis parameters (all in the excel example in the QAPP)
+AUTHOR: WEN LONG                                                                
+Date: 02/22/2012                                                                
+sediment layre thickness(cm),  !SSTATG3 is to solve sediment POC, POP, PON, POS(silicate) in steady steaete, SSTTIC is for solving all nutrients in sediment in steady steate for Initial condition, SSTATAV is for solving steady state using time averaged results 
+         HSEDALL SSTATG3 SSTATIC SSTATAV NDTSED QUASISS	
+              10       0       1       0      1       0
+ITVWCLF(flag for time varying water column condition as data file)  NTVWCLF(number of files)  WCFLDAY(legth of each file in days)
+         ITVWCLF NTVWCLF WCFLDAY
+               0       1   360.0
+diffusion rate of temperature between water column and sediment (cm^2/sec) for calculating temperature in sediments (not used)
+           DIFFT
+             1.0
+freshwater-saline water salinity threshold for sulfide (psu), salt threshold for nitrification(psu)
+          SFALSEALTSW  SALTND
+             1.0     1.0
+3G fractions of Phosphorus for Algae group 1 (when ALG1 settles to sediments, their contribution to G1(labile), G2(semilabile) and G3 (refractory) pools of POP
+         FRPALG1(1:3)
+            0.65     0.2    0.15
+3G fractions of Phosphorus for Algae group 2 
+         FRPALG2(1:3)
+            0.65     0.2    0.15
+3G fractions of Phosphorus for Algae group 3
+         FRPALG3(1:3) 
+            0.65     0.2    0.15
+3G fractions of nitrogen for Algae group 1 (when ALG1 settles to sediments, their contribution to G1, G2, G3 PON) 
+         FRNALG1(1:3)
+            0.65    0.25    0.10
+3G fractions of nitrogen for Algae group 2
+         FRNALG2(1:3)
+            0.65    0.25    0.10
+3G fractions of nitrogen for Algae group 3
+         FRNALG3(1:3)
+            0.65    0.25    0.10
+3G fractions of carbon for Algae group 1
+         FRCALG1(1:3)
+            0.65     0.2    0.15
+3G fractions of carbon for Algae group 2
+         FRCALG2(1:3)
+            0.65     0.2    0.15
+3G fractions of carbon for Algae group 3
+         FRCALG3(1:3)
+            0.65     0.2    0.15
+KPOP1(1/d) THTPOP1   KPOP2(1/d) THTPOP2   KPOP3(1/d) THTPOP3  !diagenesis reaction rates of POP (1/day), the THT*** is the theta correction due to temperature 
+           KPOP1 THTPOP1   KPOP2 THTPOP2   KPOP3 THTPOP3
+          0.0100     1.1  .00018    1.15   0.000    1.17
+KPON1(1/d) THTPON1   KPON2(1/d) THTPON2   KPON3(1/d) THTPON3 !rates for PON and its tempreature dependcy
+           KPON1 THTPON1   KPON2 THTPON2   KPON3 THTPON3
+          0.0100     1.1  .00018    1.15   0.000    1.17
+KPOC1(1/d) THTPOC1   KPOC2(1/d) THTPOC2   KPOC3(1/d) THTPOC3 !rates for POC and its temperature dependency 
+           KPOC1 THTPOC1   KPOC2 THTPOC2   KPOC3 THTPOC3
+          0.0100     1.1  .00018    1.15   0.000    1.17
+KSI(1/d)  THTASI(unitless)  THTASISAT(unitless)               !silicate dissolution rate (1/day) and also the temperature dependency, silicate saturation temperature dependency
+             KSI  THTASI  THTASISAT 
+             0.5     1.1   1.023
+M1(kg/L),M2(kg/L), THTADP(unitless), THTADD(unitless)         !sediment concentration in sediment layer 1 and 2, THTADP and THTADD is partcile mixing between layer 1,2 and diffusion
+              M1      M2  THTADP  THTADD
+            0.36    0.36   1.117    1.08
+KAPPNH4F(m/d),KAPPNH4S(m/d),PIENH4(L/kg)    ,THTANH4 ,  KMNH4(mgN/L),KMNH4O2(mgO2/L),  !chemical reaction (nitrification)
+         KPPNH4F KPPNH4S  PIENH4 THTANH4   KMNH4 KMNH4O2 THTAKMNH4
+           0.131   0.131  1.0000   1.12    0.728    0.37     1.125
+KAPPNO3F(m/d),KAPPNO3S(m/d),K2NO3(m/d)   !denitrification rates integrated over layer (1/d)*thickness ==> (m/d)
+         KPPNO3F KPPNO3S   K2NO3 THTANO3
+            0.1     0.30   0.10    1.08
+KAPP1HSD(m/d),KAPP1HSP(m/d),PIE1HS(L/kg),PIE2HS(L/kg),THTAH2S(unitless),KMHSO2(mgO2/L) !hydrogen sulfide rates, and partitioning coefficients
+          KAPPD1  KAPPP1  PIE1HS  PIE2HS THTAH2S  KMHSO2
+            0.20     0.4   100.0   100.0   1.078     4.0
+CSISATT20(mgSi/m^3),DPIE1SI(unitless),PIE2SI(L/kg),KMPSI(gSi/m^3, code will convert to mgSi/m^3) (slicate saturation concentration, partitioning and dissolution etc)
+       CSISATT20 DPIE1SI  PIE2SI   KMPSI
+         40000.0    10.0   100.0 50000.0
+O2CRITSI(mgO2/L) JSIDETR(mgSi/m^2/d,supposed to be calculated in code)
+        O2CRITSI JSIDETR  
+             2.0  0.0000
+DPIE1PO4F(unitless), DPIE1PO4S(unitless),PIE2PO4(L/kg),O2CRIT(mgO2/L),KMO2DP(mgO2/L)
+     DPIE1PO4F DPIE1PO4S PIE2PO4  O2CRIT  KMO2DP
+           20.00    20.0  20.000     2.0     4.0
+TEMPBEN(unused), KBENSTR(1/d),KLBNTH(unitless),    !temperature dependency of benthic stress, stress is calculated as accumulated enduring of low oxygen or toxic salinity)
+         TEMPBEN KBENSTR  KLBNTH   DPMIN           !used in code, -999 means not used in test case)
+          -999.0    0.03  0.0000     0.0
+KAPPCH4(m/d),THTACH4(unitless), KNMSO4 (not used by James Martin/Greg) !methane reaction rates (oxidiation of methane to CO2 in layer 1) (integrated over layer 1)
+         KAPPCH4 THTACH4 KMCH4O2   KMSO4
+             0.7   1.079 30.0640  -999.0
+spatial varying settling rates         !settling rates, CONSTANT for non-spatial varying sttling, VARYING for spatial varying
+          SPVARS  PRINTS
+        CONSTANT      NO
+Net settlng rate = (normal settling rate - resuspension rate) (m/d)  !settling rates(m/d) for all particles in water column that impacts sediment
+          WSSNET  WSLNET  WSRNET  WS1NET  WS2NET  WS3NET  WSUNET     !suspended solid, labile detritus, refractory detritus, S1,S2,S3 are 3 loading particles,WSU is un-dissolved (unavailable) silicate
+	   1.500   0.500   0.500   0.100  0.100   0.500   0.100          
+POC1R(mgC/gSediment) !reated to benthic stress??
+           POC1R
+             0.1
+spatial varying mixing rates  !burial/mixing rates of particles between layer 1 and layer 2
+          SPVARB  PRINTB
+        CONSTANT      NO
+sediment settling rate (cm/yr), particle mixing rate (m^2/d) and diffusion between water and sediment (m^2/d) (VSED is W2 in formulation, burial, inertial term in accleration for moving reference frames , VPMIX is particle mixing rate between layer 1 and 2, vdmix is diffusion rate between layer 1 and layer 2(m^2/d)
+            VSED   VPMIX   VDMIX
+          0.7000 0.00006  0.0005
+spatial varying fractions for RPOM to be distributed into G2 G3 of sediments  !Refractory POM (detritus) in water colum is split into G2 and G3 of POM in sediments
+         SPVARLR PRINTLR
+        CONSTANT      NO
+FRPOP2  FRPOP3  FRPON2  FRPON3  FRPOC2  FRPOC3 (G1 is calculated by 1-FRPOP2-FRPOP3 etc and must be zero!)
+          FRPOP2  FRPOP3  FRPON2  FRPON3  FRPOC2  FRPOC3
+           0.650   0.350   0.650   0.350   0.650   0.350
+lability switch for JPOC to 3 generartions
+      SWITCH_LAB  FRACL1  FRACL2  FRACL3
+               0     0.3     0.5     0.2

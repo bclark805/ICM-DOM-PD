@@ -1,0 +1,65 @@
+!---input file for PSWQM (modified ICM) linkage to PSFVM (FVCOM) ---
+!   comments start with exclamation !
+!
+!   Each section is grouped in a ($NAMELIST  $end) pair
+!
+
+
+$hydro_netcdf
+
+     !netcdf file names are made up by hydro_dir+hydro_prefix+filenumber+hydro_suffix, where filenumber occupies hydro_filenumwidth characters
+     !                                                                                 and  it starts with hydro_filenumstart
+
+hydro_dir='/data/users/bclark/chesfvm/cpb/rhodefvm/baseline2/netcdf/'
+!hydro_dir='/data/users/bclark/chesfvm/cpb/rhodefvm/sens_analysis2/test7/netcdf/'
+
+	!/home/long075/mypsfvm/trunk/example/channel-with-salt-tide/model_output/netcdf/'
+                                                              !directory name where the fvcom, note that have to have '/' at the end
+                                                              !if the files are in current dir, simply put './' for unix/linux platform
+     hydro_prefix='rhd_'                                      !prefix part of the file name
+     hydro_suffix='.nc'                                       !extension name
+     hydro_filenumwidth = 4                                   !number of digits in file number following hydro_prefix
+     hydro_filenumstart= 93   !  106                                    !number in first netcdf input file
+     hydro_Nrec   = 24                                        !number of records in each netcdf file
+     hydro_dlt    = 3600.0                                    !time step of hydrodynamics (Unit: seconds) !better be 100sec
+
+           !The above setup gives clue to the following FVCOM field history output filenames 
+           !
+           !     /home/long075/work/Puget_Sound_2.0/WQ_PS2.0_Hyd_Run9_01/Run_April_30_MD_BND/input-netcdf/psm_0001.nc 
+           !     /home/long075/work/Puget_Sound_2.0/WQ_PS2.0_Hyd_Run9_01/Run_April_30_MD_BND/input-netcdf/psm_0002.nc
+           !      ...
+           !that the model will look for to read in. 
+
+$end
+
+$wqm_history
+    HISFN = 'outputs/rhd_history.out'                         !history output file name
+    t_his_start = 0.                                         !starting time in history output (days)
+    t_his_end   = 242.                                        !ending time in history output (days)
+    t_his_dlt   = 242.                                        !interval of history output (days)
+    HISFN_SPLIT_BYLEVEL= .TRUE.                              !Split history fields into files level by level
+$end
+
+$wqm_stations
+
+    STNFN       = 'outputs/rhd_station.out'                  !station output file name (including path if any, length must not exceed 1024 characters)
+
+    Nstation    = 13                                         !total number of stations (must be less than NstationMax set in mod_var.F and greater than 1)
+
+  !  NstationNum_GL =  2694, 5901, 7413
+                                                             !node numbers in fvcom model grid for outputing station timeseries
+                                                             !number of entries here should be equal to Nstation (must not exceed maximum node number and
+                                                             !be greater than 0)
+
+                    !!!       MARSH  WEIR  A4    A5    A6    A7     A8   A9    A10    A11  DOCK  3.3C  4.1C                             !node numbers in fvcom model grid for outputing station timeseries
+              NstationNum_GL = 7656, 7355, 7224, 7196, 7129, 7071, 6984, 6875, 6744, 6434, 5856, 2687, 352      
+!2694: ~ CB3.3C
+!5901: SERC DOCK
+!7413: KIRK MARSH WEIR
+
+    t_stn_start = 0.                                        !starting time in station output (days)
+    t_stn_end   = 242.                                      !ending time in station output (days)
+    t_stn_dlt   = 242.                                   !interval of station output (days)
+
+$end
+

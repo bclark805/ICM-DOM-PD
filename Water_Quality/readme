@@ -1,0 +1,15 @@
+The three files contained here are used to run the FVCOM coupled with
+
+ICM-DOM-PD water quality model.  
+
+wqm_con.npt contains the time stepping and some forcing file definitions used by the model
+
+wqm_linkage.in contains information and the location of the FVCOM hydrodynamic files used 
+
+to drive ICM-DOM-PD. 
+
+*_netcdf.dat contains information on the netcdf outputs
+
+to run the model, there must be a
+
+an "output" directory, and an "output/netcdf" directory

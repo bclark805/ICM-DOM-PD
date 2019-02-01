@@ -1,0 +1,135 @@
+Parameters for algae growht and partitioning
+from Cerco and Noelle 2017
+Chesapeake Bay Program Water Quality Model
+Optimization, where available
+Modified by B Clark January 2018, HPL, UMCES
+JLM ERDC WES                                                            
+                                                                        
+LIMITS   MINPROD  ! can be minimum or maximum, minimum includes light as a limiting nutrient, maximum uses light available to scale limitation by nutrients                                                      
+         MINIMUM
+                                                                        
+PREDATN     TRPR    KTPR                                                
+            20.0  0.0320
+                                                                        
+FRACTN N    FNIP    FNUP   FNDP    FNLP    FNRP   ! From algal predation             
+            0.20    0.00   0.200   0.100   0.500                
+old         0.40    0.00   0.250   0.100   0.300   0.100                
+FRACTN P    FPIP    FPDP   FPLP    FPRP                        
+            0.10    0.45   0.150   0.30                        
+old         0.50    0.30   0.100   0.070   0.030                        
+FRACTN C    FDOP   FCDP    FCLP    FCRP    ! Remineralization fraction, DOM fraaction, LPOM fraction, RPOM fraction                    
+            0.20    0.20   0.100   0.500                        
+                                                                        
+FRACTN SI   FSAP                                                        
+             0.3
+                                                                        
+GROUP 1 1   ANC1     Q01    ASC1    STF1                                
+           0.135  0.0125   0.333     0.1                                
+                  0.0100             1.8                                
+GROUP 1  CHLCMN1  ACHLC1  BCHCL1  CCHLC1      ! just using CHLCMN1 as the chl to C ratio; not dynamically calculated                          
+           0.020  0.0000    0.05   0.059                              
+old        0.020                                                        
+GROUP 1 2   KHN1    KHP1    KHS1   KHST1  KHNFIX   FNFIX        
+           0.025  0.0000    0.00     2.0    0.00   0.000        
+   old      0.025      0.0025                     2.5                        
+GROUP 1 3 ALPHMN ALPHRAT   PRSP1   VMAX1                                
+            8.00  0.0000    0.25  0.0100                                
+old         3.15/8.00             0.0050                               
+GROUP 1 4   TMP1     TR1                                                
+             16.0   20.00                                                
+                                                                        
+GROUP 1 5  KTG11   KTG12    KTB1                                        
+          0.0018  0.0060   0.032                                        
+old       0.0080                                                        
+GROUP 1 6   FNI1   FNLP1   FNRP1 ! Algae metabolism                       
+            0.00   0.000   0.00                        
+old         0.55   0.200   0.050                        
+GROUP 1 7   FPI1   FPLP1   FPRP1  ! P from metabolism                       
+            0.00   0.000   0.000                        
+old         0.75   0.000   0.000                        
+GROUP 1 8  FCLP1   FCRP1                                
+            0.00   0.000                                
+                                                                        
+GROUP 2 1   ANC2     Q02    ASC2    STF2                                
+           0.175  0.0175   0.000    0.00                                
+old               0.010             0.50                                
+GROUP 2  CHLCMN2  ACHLC2  BCHCL2  CCHLC2                                
+           0.020  0.0000    0.05   0.059                                
+                                                                        
+GROUP 2 2   KHN2    KHP2    KHS2   KHST2                        
+           0.025  0.0000    0.050     2.0                        
+old        0.025       0.0025                     20.0                        
+GROUP 2 3 ALPHMN ALPHRAT   PRSP2   VMAX2                                
+           08.00   0.000    0.25  0.0100                                
+old         8.00                  0.0022                                
+GROUP 2 4   TMP2     TR2                                                
+            25.0   20.00                                                
+                                                                        
+GROUP 2 5  KTG21   KTG22    KTB2                                        
+         0.0035  0.00000   0.032                                        
+old      0.00400 0.01200                                                
+GROUP 2 6   FNI2   FNLP2   FNRP2   ! Nitrogen from metabolism                    
+            0.00   0.000   0.000                        
+old         0.55   0.200   0.050                        
+GROUP 2 7   FPI2   FPLP2   FPRP2   ! P From Metabolism                     
+            0.00   0.000   0.000                        
+old         0.75   0.000   0.000                        
+GROUP 2 8  FCLP2   FCRP2 ! CARBON FROM METABOLISM
+           0.000   0.000
+                                                                        
+GROUP 3 1   ANC3     Q03    ASC3    STF3                                
+           0.175  0.0040   0.000    0.00                                
+old               0.0050   0.300    0.05                                
+GROUP 3  CHLCMN3  ACHLC3  BCHCL3  CCHLC3                                
+           0.020  0.0000    0.05   0.059                                
+                                                                        
+GROUP 3 2   KHN3    KHP3    KHS3   KHST3                        
+           0.025 0.00100   0.000    35.0                        
+old                        0.100                                        
+GROUP 3 3 ALPHMN ALPHRAT   PRSP3   VMAX3                                
+            5.00   0.000    0.25  0.0044                                
+old         8.00                  0.0033                                
+GROUP 3 4   TMP3     TR3                                                
+            35.0   20.00                                                
+                                                                        
+GROUP 3 5  KTG31   KTG32    KTB3                                        
+         0.01000 0.01000  0.0322                                        
+old      0.00300                                                        
+GROUP 3 6   FNI3   FNLP3   FNRP3                        
+            0.55   0.200   0.050                        
+old         0.55   0.200   0.050                        
+GROUP 3 7   FPI3   FPLP3   FPRP3                        
+            0.75   0.000   0.000                        
+old         0.75   0.000   0.000                        
+GROUP 3 8   FCLP3   FCRP3                                
+            0.000   0.000                                
+                                                                        
+GROUP 1   SPVAR1  PRINT1                                                
+        CONSTANT      NO
+                                                                        
+     BOX     PM1    BMR1    BPR1                                        
+       1   300.0   0.01    1.500
+   old     250.0   0.02                                                 
+GROUP 2   SPVAR2  PRINT2                                                
+        CONSTANT      NO
+                                                                        
+     BOX     PM2    BMR2    BPR2                                        
+       1   350.0   0.02    1.500
+   old     300.0   0.02    0.750                                        
+GROUP 3   SPVAR3  PRINT3                                                
+        CONSTANT      NO
+                                                                        
+     BOX     PM3    BMR3    BPR3                                        
+       1   250.0   0.050   0.300
+    old    250.0   0.02    0.750                                        
+PREDATN    TPVAR   PRINT                                                
+        CONSTANT     ALL
+                                                                        
+             DAY    TVPR                                                
+       1           1.000
+                                                                        
+GROUP 2    TB2GR   PRINT                                                
+        CONSTANT     ALL
+                                                                        
+             DAY   TB2GR                                                
+       1           1.000

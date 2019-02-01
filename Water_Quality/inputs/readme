@@ -1,0 +1,33 @@
+The parameterizations in this file will be from 
+
+the most recent implementatino of the Chesapeake Bay Program water quality model
+
+detailed by Carl Cerco and Mark Noelle in a report from 2017
+
+the kinetic formulations and algae growth and nutrient partitioning fractions are
+
+the parameters that are changed
+
+parameters related to colred and non-colored carbon are from other sources
+
+this will be for publication
+
+See Clark et al., " A comprehensive estuary organic carbon budget and the impact of tidal wetlands on estuarine biogeochemistry"
+
+
+
+The following is brief file descriptions for the inputs:
+
+RR_newPD_meteorlogical2.dat --- Meteorology forcing file
+mineralization_newDOM.3_yr_8 --- Organic matter mineralization, nutrient parameterization file
+rhd0000_riv.dat --- river forcing file
+rhd_initial_wq_vert_restart1.dat --- initial condition for water column
+rhd_obc_wq.dat --- open boundary water column time series forcing file
+rhd_pnt_wq.dat --- point source file
+rhd_seddiag_2b.npt --- sediment diagenesis parameter file
+seddom_grid.dat --- sediment DOM/ marsh definition file
+settling.10_yr_3 --- particulate settling parameterization file
+wcdom_apqy.npt --- Apparent Quantum Yield parameterization file
+wcdom_control.npt  --- water column DOM parameterization file 
+wqm_algae.3_yr_7 --- Algal parameterization file
+wqm_kei_photoDEG_v8_1.csv --- water column light absorption parameterization file
