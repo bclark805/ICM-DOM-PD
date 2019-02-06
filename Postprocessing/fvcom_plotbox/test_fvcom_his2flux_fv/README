@@ -1,0 +1,67 @@
+.
+|-- CHN_HYD.mat			- example channel case grid file (generated using sms2dm2mat)
+|-- README			- this file
+|-- his2flux.mat		- example input data
+`-- trans_loc_cross.mat		- cross section of the example channel case
+
+
+ The his2flux.mat store example input control of this flux calculation program:
+
+
+his2flux =
+
+    fvcom_mat_grid_file: './CHN_HYD.mat'			-matlab format of the fvcom grid file, if you don't have it
+									%you can use sms2dm2mat to generate it from the 2dm grid
+                his_dir: './netcdf'				-folder storing the netcdf outputs (must have u,v,ww,salinity, w, wt, kh, viscofh)
+
+           hfile_prefix: 'chn'					-case name of the run
+              hfile_ext: '.nc'					-extention of the output files (.nc for netcdf)
+                 his_Nz: 10					-number of layers in the model
+           his_fn_start: 6					-start number of the netcdf file, 1 for chn_0006.nc
+             his_fn_end: 7					-end number of the netcdf file used for flux calculation, 7 for chn_0007.nc
+    fvcom_medm2txt_exec: 'fvcom_medm2txt'			-- NOT USED
+             tracername: 'salinity'				-tracer name, for salinity (i.e. variable name of the tracer in the netcdf files)
+              transname: 'cross'				-name of the cross section, any string without space
+                     xt: [-44363 -44363]			-start and end x-coordinates of the transect
+                     yt: [-539 3379]				-start and end y-coordinates of the transect
+            ds_transect: 100					-segment length used to sample the transect (m)
+                  t_int: 1					-time index intervals used for subsample the netcdf oututs in time, 2 for very 2 records
+             plotoutdir: './cross/'				-folder to store outputs (.plt and .mat files)
+
+
+How to try this example:
+
+	start xming on windlows
+	set up putty to enable X11 forwarding (open putty, go to settings in the SSH-->X11, check X11 forwarding, go to Session and save 
+
+	log on to the linux machine using putty        
+
+	matlab -nodesktop					%run matlab without GUI
+	> startup						%execute $HOME/matlab/startup.m to setup various tools used for this program
+	> load his2flux.mat
+	> his2flux  %this will show all information 
+	> %modify his2fux as you wish
+	> fvcom_his2flux_fv(his2flux)				%call fvcom_his2flux_fv to calculat the flux (volume, salt, freshwater)
+	> 
+	>							%results will be in ./cross/ folder with a series of .plt and .mat files
+	>							%where 'cross' is the name of thransect in his2flux 
+
+
+How to try this example to generate a TCE edge line that connects the transects above in xt, yt
+
+	start xming on windlows
+	set up putty to enable X11 forwarding (open putty, go to settings in the SSH-->X11, check X11 forwarding, go to Session and save 
+
+	log on to the linux machine using putty        
+
+	matlab -nodesktop					%run matlab without GUI
+	> startup						%execute $HOME/matlab/startup.m to setup various tools used for this program
+	> load his2flux.mat
+	> his2flux  %this will show all information 
+	> %modify his2fux as you wish
+        > [TCE_edge_line, TCE_edge_element, TCE_edge_ele_edge, TCE_edge_flux_sign]=fvcom_his2flux_fv(his2flux)
+	> 
+	>							%results will be in ./cross/ folder with a series of .plt and .mat files
+	>							%where 'cross' is the name of thransect in his2flux 
+
+
