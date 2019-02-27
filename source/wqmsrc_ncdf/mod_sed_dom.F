@@ -1523,7 +1523,7 @@ END IF
 	
     EXRATE = GET_ZHTA(P_EX_RATE(I),SED_TEMP(I),EXRATE_TEMPCON)	
 !EXRATE = 0.0  ! B Clark temp adtiion to get more DOm into marsh sediments	
-	JMDOM = MARSH_MASS(I)*MARSH_FRAC(I)*EXRATE*3.0!*0.1  ! we will only loop over the marsh nodes, but will have MDOM be defined globally
+	JMDOM = MARSH_MASS(I)*MARSH_FRAC(I)*EXRATE!*0.1  ! we will only loop over the marsh nodes, but will have MDOM be defined globally
 !write(*,*)'JMDOM = ',JMDOM
 !FRACTIONATION OF OUR DOM INTO COLORED AND NON COLORED PARTS
 	JCMDOC(I)  = CDOCFRAC*JMDOM       !flux of cdom and ncdom from the marshes
