@@ -23,7 +23,7 @@ mineralization_newDOM.3_yr_8 --- Organic matter mineralization, nutrient paramet
 rhd0000_riv.dat --- river forcing file
 rhd_initial_wq_vert_restart1.dat --- initial condition for water column
 rhd_obc_wq.dat --- open boundary water column time series forcing file
-rhd_pnt_wq.dat --- point source file
+rhd_pnt_wq.dat --- point source file for point source pollution loading, only use when not specified as a river.
 rhd_seddiag_2b.npt --- sediment diagenesis parameter file
 seddom_grid.dat --- sediment DOM/ marsh definition file
 settling.10_yr_3 --- particulate settling parameterization file
