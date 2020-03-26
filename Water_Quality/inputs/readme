@@ -20,10 +20,10 @@ The following is brief file descriptions for the inputs:
 
 RR_newPD_meteorlogical2.dat --- Meteorology forcing file
 mineralization_newDOM.3_yr_8 --- Organic matter mineralization, nutrient parameterization file
-rhd0000_riv.dat --- river forcing file
+rhd0091_riv.dat --- river forcing file (not used, rhd_pnt_wq.dat is used
 rhd_initial_wq_vert_restart1.dat --- initial condition for water column
 rhd_obc_wq.dat --- open boundary water column time series forcing file
-rhd_pnt_wq.dat --- point source file for point source pollution loading, only use when not specified as a river.
+rhd_pnt_wq.dat --- point source file for point source pollution loading, acts as a river
 rhd_seddiag_2b.npt --- sediment diagenesis parameter file
 seddom_grid.dat --- sediment DOM/ marsh definition file
 settling.10_yr_3 --- particulate settling parameterization file
