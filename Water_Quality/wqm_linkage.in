@@ -10,7 +10,7 @@ $hydro_netcdf
      !netcdf file names are made up by hydro_dir+hydro_prefix+filenumber+hydro_suffix, where filenumber occupies hydro_filenumwidth characters
      !                                                                                 and  it starts with hydro_filenumstart
 
-hydro_dir='/data/users/bclark/chesfvm/cpb/rhodefvm/baseline2/netcdf/'
+hydro_dir='/discover/nobackup/projects/yukonriver/RhodeRiver/FVCOM2.7/netcdf/'
 !hydro_dir='/data/users/bclark/chesfvm/cpb/rhodefvm/sens_analysis2/test7/netcdf/'
 
 	!/home/long075/mypsfvm/trunk/example/channel-with-salt-tide/model_output/netcdf/'
@@ -34,8 +34,8 @@ $end
 
 $wqm_history
     HISFN = 'outputs/rhd_history.out'                         !history output file name
-    t_his_start = 0.                                         !starting time in history output (days)
-    t_his_end   = 242.                                        !ending time in history output (days)
+    t_his_start = 91.                                         !starting time in history output (days)
+    t_his_end   = 333.                                        !ending time in history output (days)
     t_his_dlt   = 242.                                        !interval of history output (days)
     HISFN_SPLIT_BYLEVEL= .TRUE.                              !Split history fields into files level by level
 $end
@@ -57,8 +57,8 @@ $wqm_stations
 !5901: SERC DOCK
 !7413: KIRK MARSH WEIR
 
-    t_stn_start = 0.                                        !starting time in station output (days)
-    t_stn_end   = 242.                                      !ending time in station output (days)
+    t_stn_start = 91.                                        !starting time in station output (days)
+    t_stn_end   = 333.                                      !ending time in station output (days)
     t_stn_dlt   = 242.                                   !interval of station output (days)
 
 $end
