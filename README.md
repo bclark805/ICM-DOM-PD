@@ -19,6 +19,10 @@ ICM-DOM-PD is intended for research purposes only, and the authors are not respo
  
 Contact Blake Clark for any specific questions
 
+The DOI for version 0.1 is:
+
+https://zenodo.org/badge/latestdoi/168745609
+
 bclark@umces.edu
 
 Chen, C., Liu, H., & Beardsley, R. C. (2003). An Unstructured Grid, Finite-Volume, Three-Dimensional, Primitive Equations Ocean Model: Application to Coastal Ocean and Estuaries. Journal of Atmospheric and Oceanic Technology, 20(1), 159–186.
