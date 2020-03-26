@@ -10,7 +10,7 @@ $hydro_netcdf
      !netcdf file names are made up by hydro_dir+hydro_prefix+filenumber+hydro_suffix, where filenumber occupies hydro_filenumwidth characters
      !                                                                                 and  it starts with hydro_filenumstart
 
-hydro_dir='/discover/nobackup/projects/yukonriver/RhodeRiver/FVCOM2.7/netcdf/'
+hydro_dir='/Users/jbclark8/Desktop/RhodeRiver/FVCOM_baseline_outputs/netcdf/'
 !hydro_dir='/data/users/bclark/chesfvm/cpb/rhodefvm/sens_analysis2/test7/netcdf/'
 
 	!/home/long075/mypsfvm/trunk/example/channel-with-salt-tide/model_output/netcdf/'
