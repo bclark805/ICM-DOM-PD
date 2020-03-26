@@ -352,24 +352,9 @@ CONTAINS
 
 #if defined(PHOTODEGRADATION)
 	 ! 
-	 !READ(KEI,10371) GSTAR440(1),GSTAR440(2), GSTAR440(3), PHISTAR676,BNSTARNTU,BNSTARCHL,PSTARINT,   &
-     !                      PSTAR440,PSTARCOLOR, SCDOM 
-	   
 	   	   
        READ(KEI,1037) GSTAR440,PHISTAR676,BNSTARNTU,BNSTARCHL,PSTARINT,   &   ! dont need a spectral GSTAR440 if we have the CDOM normalized absorption curves
                       PSTAR440,PSTARCOLOR,SCDOM  ! just read in the same as before
-					  
-		   
-	   ! OPEN OUR CDOM SPECFIC SPECTRA FILE FOR CDOM1
-	 !  CDOM_ASTAR_FIN = 'CDOM1_specABS.dat'
-	!   CDOM_ASTAR_FOUT = 'CDOM1_out.dat'
-	 !  OPEN(unit=954,file=CDOM_ASTAR_FIN)
-	 !  OPEN(UNIT=955,file=CDOM_ASTAR_FOUT)
-	   
-	!   READ(954,*)CDOM_counter, CDOM_wavel   ! first number of file is number of columns, second is number of row (wavelengths)
-	!  write(*,*)'CDOM counter = ',CDOM_counter
-	!   write(*,*)'CDOM wavelenghts = ',CDOM_wavel
-	   
 
 #else
 	   
@@ -404,17 +389,7 @@ CONTAINS
 	   
 	   	   
 #if defined(PHOTODEGRADATION)
-	   !IF(NWAVEL /= CDOM_wavel)THEN
-	   
-	!		write(*,*)' Number of CDOM specfic absorption wavelenghts'
-	!		write(*,*)' Is not equal to the number of wavelentghs in KEI file'
-	!		write(*,*)' Stopping Program'
-	!		STOP
-	!		
-	   !END IF
-	   
-	 ! CDOM2_ABSin(:,:), CDOM3_ABSin(:,:) 
-	   
+
 	!   ALLOCATE(CDOM1_ABSin(CDOM_wavel,CDOM_counter))  ! allocate the variable to the number of wavelengths x the number of spectra
 	IF(PHOTODEG)THEN  
 	DO I =1 , NWAVEL   
@@ -422,87 +397,26 @@ CONTAINS
 		
 	   READ(KEI,*) WAVEL(I),ALAMB(I),GLAMB(I,1),GLAMB(I,2),GLAMB(I,3),PHILAMB(I),PLAMB(I),      &
                     BLAMB(I),EZERO(I)
-					
-	   !write(*,*) WAVEL(I),ALAMB(I),GLAMB(I,1),GLAMB(I,2),GLAMB(I,3),PHILAMB(I),PLAMB(I),      &
-           !         BLAMB(I),EZERO(I)			
-		!			
-		!DO iCDOM = 1,CDOM_counter
-		
-		!    read(954,398(11.5F))CDOM1_ABSin(I,:)
-		!	write(*,*)' i, cdom counter',I,iCDOM
-		!	write(*,*)'CDOM1_abs = ',CDOM1_ABSin(I,iCDOM)
-		!!	
-		
-		!END DO
-        !write(*,*)'EZERO(I) = ',EZERO(I)
-	!		READ(954,*) (CDOM1_ABSin(I,J),J=1,CDOM_counter)
-			!read(954,*)				
+			
 	END DO   
 	
          BLAMB = 0.0099	 ! B Clark updated Dec. 2017 Following ROSE et al., 2017
                                 ! For a constant scattering for particles across
                                 ! all wavelengths
-	  !  read(954,*)CDOM1_ABSin
-			!write(*,*)' i, cdom counter',I,iCDOM
-		!	write(*,*)'CDOM1_abs = ',CDOM1_ABSin
-        ELSE
+
+     ELSE
         
                  READ(KEI,*) (WAVEL(I),ALAMB(I),GLAMB(I,1),PHILAMB(I),PLAMB(I),      &
                     BLAMB(I),EZERO(I),I=1,NWAVEL)
         
         ENDIF
 
-
-!	write(*,*) (CDOM1_ABSin(I,J),J=1,CDOM_counter)
-!	close(954)
 #else	   
 	   
        READ(KEI,*) (WAVEL(I),ALAMB(I),GLAMB(I),PHILAMB(I),PLAMB(I),      &
                     BLAMB(I),EZERO(I),I=1,NWAVEL)
 	   
 #endif
-	! B Clark commented below section out. June 2017
-	  ! with new V4 photoDEG forcing, we no longer need colors or turb
-       !READ (KEI,1082) SPVARKE, PRINTKE
-	   !write(*,*)'SPVARKE = ',SPVARKE
-	   !write(*,*)'PRINTKE = ',PRINTKE
-       !IF (SPVARKE == 'CONSTANT') THEN
-	!		READ (KEI,1087) COLOR(1,1),TURB(1,1)
-	!		write(*,*)'COLOR = ',COLOR(1,1)
-	!		write(*,*)'TURB = ',TURB(1,1)
-	!		DO K=1,KBM1
-	!		DO I=1,MTLOC
-	!			COLOR(I,K)   = COLOR(1,1)
-	!			TURB(I,K)    = TURB(1,1)
-	!		ENDDO  
-	!		ENDDO
-       !ELSE
-	!		ALLOCATE(RTMP2(MGL,KBM1));    RTMP2 = 0.0
-	!		ALLOCATE(RTMP21(MGL,KBM1));   RTMP21 = 0.0
-	!		DO K=1,KBM1
-	!			READ (KEI,1087) (COLOR(I,K),TURB(I,K),I=1,MGL)
-	!		ENDDO  
-	 
-	!		IF(SERIAL)THEN
-	!			COLOR = RTMP2
-	!			TURB  = RTMP21
-	!		ENDIF
-#if defined (MULTIPROCESSOR)
-			!IF(PAR)THEN
-			!	DO K=1,KBM1
-			!		DO I=1,MLOC
-			!			COLOR(I,K) = RTMP2(NGID(I),K)
-			!			TURB(I,K)  = RTMP21(NGID(I),K)
-			!		ENDDO
-			!		DO I=1,NHN
-			!			COLOR(I+MLOC,K) = RTMP2(HN_LST(I),K)
-			!			TURB(I+MLOC,K)  = RTMP21(HN_LST(I),K)
-			!		ENDDO
-			!	ENDDO
-			!ENDIF
-#endif
-			!DEALLOCATE(RTMP2,RTMP21)
-      ! ENDIF
 
 	   
 #if defined(PHOTODEGRADATION)	   
@@ -639,23 +553,6 @@ CONTAINS
 		
    END SUBROUTINE OWQ_DEALLOC
 
-	!FUNCTION   OWQ(COLORS,CHL,TURBS,DEPTH,AVREFCOS)
-	!SUBROUTINE LGHT_ATTN()			!calculate light attenuation
-    !SUBROUTINE OWQ_ALLOC()
-    !SUBROUTINE OWQ_DEALLOC()
-	!SUBROUTINE OWQ_READ()
-   
-
-!=========================================================================
-!
-!MAKE OWQ the subroutine for calculating the abs due to all cdom parts and then
-!find the irradiaton left over, while still finding the total diffuse attenuation coefficient
-!
-!
-!  When do we integrate our function over wavelenght?
-!  in the wc_dom subroutine!!! 
-!
-
 !=========================================================================
 
 ! Added in to remove the older function that was clunky
@@ -675,13 +572,11 @@ CONTAINS
 !!!!!!!!!!===================!!!!!!!!!!!!!!!!
 
 !  write(*,*)'PHOTOCHEMISTY Loop Activated'
-  
-DO I=1,MLOC
+DO J=1,NWAVEL  
+  DO K = 1,KBM1
+    DO I=1,MLOC
 
- DO K = 1,KBM1
 
-   DO J=1,NWAVEL
-   
    ! Updated code uses specific absorption curves and concentration of each absorbing compound
    	 
 	 ABSCDOM(I,K,J,1) = GLAMB(J,1)*WC_CDOC1(I,K) !  ! get all 3 cdoms and add em up, want to keep the array for calculating the irradiance lost due to each CDOM
@@ -699,52 +594,52 @@ DO I=1,MLOC
      ABTOT  = ALAMB(J) + ABCHL + ABNAPM +SUM(ABSCDOM(I,K,J,:))  ! get the total absorbance with all 3 cdoms
 
      SCAT  = BLAMB(J)*TSS(I,K)  ! B Clark June 2017  !*B440(I,K)
-	 
-	 ! B Clark put all this in th eloop so now the subrotuine is onl y called once and it calculates everything
- ! FIRST ESTIMATE ATTENUATION BASED ON DEPTH TO 1% LIGHT PENETRATION
-      KDLAMB = SQRT (ABTOT * ABTOT + GMUZERO(2) * ABTOT * SCAT )   &
-                 /AVREFCOS
 
-! PERCENT LIGHT REMAINING
-      PLR = EXP ( -KDLAMB * DEPTH )
+     ! B Clark updated to the Lee et al., model Feb 2020
+! 	 ! B Clark put all this in th eloop so now the subrotuine is only called once and it calculates everything
 
-! USE LOOKUP TABLE TO REFINE ESTIMATE OF SCATTERING FUNCTION BASED ON 
-! PERCENT LIGHT REMAINING
 
-     REFSCAT = GMUZERO(9)
-     DO Iscat=1,8
-       IF (PLR >= OPZ(Iscat) .AND. PLR < OPZ(Iscat+1)) THEN
-         REFSCAT = GMUZERO(Iscat)
-         GO TO 1
-       ENDIF
-     ENDDO
-       
-1    CONTINUE
-        
-! RE-EVALUATE ATTENUATION BASED ON REFINED SCATERING FUNCTION
-     KDLAMB_out(I,K,J) = SQRT (ABTOT * ABTOT + REFSCAT * ABTOT * SCAT )/AVREFCOS 
+      CALL KD_LEE(DECL*180.,ABTOT,SCAT,KDLAMB_out(I,K,J))
 
 ! COMPUTE REMAINING SPECTRAL IRRADIANCE
 
-     EZ(J) = I0*EZERO(J) * EXP( -KDLAMB_out(I,K,J) * DEPTH )
+      EZ(J) = I0*EZERO(J) * EXP( -KDLAMB_out(I,K,J) * DEPTH )
 	 
-!	 write(*,*)'EZERO = ',EZERO(J)
-!	 WRITE(*,*)'EZ = ',EZ(J)
+!OLD CODE
+     !  ! FIRST ESTIMATE ATTENUATION BASED ON DEPTH TO 1% LIGHT PENETRATION
+!       KDLAMB = SQRT (ABTOT * ABTOT + GMUZERO(2) * ABTOT * SCAT )   &
+!                  /AVREFCOS
 
-  ENDDO  ! NWAVEL loop
-   
+! ! PERCENT LIGHT REMAINING
+!       PLR = EXP ( -KDLAMB * DEPTH )
+
+! ! USE LOOKUP TABLE TO REFINE ESTIMATE OF SCATTERING FUNCTION BASED ON 
+! ! PERCENT LIGHT REMAINING
+
+!      REFSCAT = GMUZERO(9)
+!      DO Iscat=1,8
+!        IF (PLR >= OPZ(Iscat) .AND. PLR < OPZ(Iscat+1)) THEN
+!          REFSCAT = GMUZERO(Iscat)
+!          GO TO 1
+!        ENDIF
+!      ENDDO      
+! 1    CONTINUE
+        
+! ! RE-EVALUATE ATTENUATION BASED ON REFINED SCATERING FUNCTION
+!      KDLAMB_out(I,K,J) = SQRT (ABTOT * ABTOT + REFSCAT * ABTOT * SCAT )/AVREFCOS 
+
+
+    ENDDO  ! NWAVEL loop  
   ENDDO
 ENDDO
 !write(*,*)' now onto the new CDOM absorption parts'
 ! Still need to get a formula to convert SWRAD to UV-VIS energy
 !write(*,*)'abscdom  = ' , ABSCDOM 
-
-  DO J=1,NWAVEL
-   	  
-     I0_lambda(j) = I0 * EZERO(j)   ! This gives the spectral distribution of our shortwave radiation, before the model took par,
-   END DO                      !we are using shortwave radiation now
- IAVG = 0.0	 ! set to zero before integration
-KDLAMB_int=0.0
+! DO J=1,NWAVEL
+    I0_lambda= I0 * EZERO  ! This gives the spectral distribution of our shortwave radiation, before the model took par,
+! END DO                      !we are using shortwave radiation now
+   IAVG = 0.0	 ! set to zero before integration
+   KDLAMB_int=0.0
  DO I=1,MLOC
  
    DO J = 1,NWAVEL    ! This will need to be spectrally dependent to get the photobleaching correct
@@ -771,6 +666,7 @@ KDLAMB_int=0.0
 		  	if(ICDOM_abs(I,1,J,idom) < 0.0) THEN
 				   ICDOM_abs(I,1,J,idom)=0.0
 			 ENDIF
+			 N_photons(I,1,j,Idom)  = (ICDOM_abs(I,1,j,Idom)*WAVEL(J)*5.03E15 ) / 6.0221409E+23  
         END DO
 	 END DO 
 	 
@@ -788,8 +684,6 @@ KDLAMB_int=0.0
 	 
      !  Np = E/Ep= E•((λ•10-9)/h•c) = E [W/m2]•λ•10-9[m]•/ (1.988•10-25) [J/s•m/s]
   !       =  E•λ•5.03•1015 [1/(m2•s)] 
-		
-	 
 
 	   DO J = PAR_MARK,NWAVEL
 	     
@@ -802,10 +696,8 @@ KDLAMB_int=0.0
 	   
 	  KDLAMB_int(I,1)=KDLAMB_int(I,1)/(NWAVEL-PAR_MARK) ! Get the average KD across PAR
 	  
-
     DO K=2,KBM1 ! loop through the rest of the grid vertically
 	
-		
 	       DO J = 1,NWAVEL
             IATTOP = IATBOT(J)
             OPTDEPTH = KDLAMB_out(I,K,J)*D(I)*DZ(K)   ! now need to make this spectrally depenedent so that we get the spectral irradiance left over 
@@ -816,26 +708,24 @@ KDLAMB_int=0.0
 
               DO Idom = 1,3
 		   
-               !CDOM_optdepth = ABSCDOM(I,K,J,Idom)*D(I)*DZ(K)  ! Simple photodegradation update B Clark April 2016, we want to use each wavelenght 
-			!									   ! so that we get a spectral quantum yield before integrating the total DOC that gets photodegraded
-               !ICDOM_bot     = IATTOP*EXP(-CDOM_optdepth)    ! This calculates the light remaining after absorption by CDOM1
-			   
-               !ICDOM_abs(I,K,J,Idom) = IATTOP-ICDOM_bot ! W / m^2 / day
 			! B Clark updated code to get light absorbed by each CDOM according to Hu et al., 2002, L&O
 										  
-                       ICDOM_abs(I,K,J,Idom) = IATTOP*ABSCDOM(I,K,J,Idom)/ KDLAMB_out(I,K,J)- &
-																			 
-									 	IATTOP*ABSCDOM(I,K,J,Idom)/ KDLAMB_out(I,K,J)*EXP(-OPTDEPTH)! W / m^2 / day               
+                ICDOM_abs(I,K,J,Idom) = IATTOP*ABSCDOM(I,K,J,Idom)/ KDLAMB_out(I,K,J)- &
+                                        IATTOP*ABSCDOM(I,K,J,Idom)/ KDLAMB_out(I,K,J)*EXP(-OPTDEPTH)! W / m^2 / day     
+                                                  
 				if(ICDOM_abs(I,K,J,idom) < 0.0) THEN
 				     ICDOM_abs(I,K,J,idom)=0.0
 				ENDIF   
+				! mol Photons/m^2/s, still need to convert to mols Photons for use with our AQY in mod_wc_dom
+				N_photons(I,K,j,Idom)  = (ICDOM_abs(I,K,j,Idom)*WAVEL(J)*5.03E15 ) / 6.0221409E+23    
 			  END DO
        END DO
 	   
 	   DO J = PAR_MARK,NWAVEL	     
 	       IAVG(I,K) = IAVG(I,K) + IAVG_pd(I,K,J) * (WAVEL(J)  &
 						*4.3459E20) / 6.0221409E+23      
-		   KDLAMB_int(I,K)=KDLAMB_int(I,K)+KDLAMB_out(I,K,J)		 
+		   KDLAMB_int(I,K)=KDLAMB_int(I,K)+KDLAMB_out(I,K,J)	
+		   
 	   END DO  ! K
 	   
 	   KDLAMB_int(I,K)=KDLAMB_int(I,K)/(NWAVEL-PAR_MARK) ! Get the average KD across PAR
@@ -844,11 +734,6 @@ KDLAMB_int=0.0
 
 	END DO  ! I
 
-   DO J = 1,NWAVEL	
-   
-	   N_photons(:,:,j,:)  = (ICDOM_abs(:,:,j,:)*WAVEL(J)*5.03E15 ) / 6.0221409E+23    ! mol Photons/m^2/s, still need to convert to mols Photons for use with our AQY in mod_wc_dom
-	
-   END	DO
 
 END SUBROUTINE PHOTOCHEMISTRY
    
@@ -1013,10 +898,7 @@ SUBROUTINE LGHT_ATTN
   END DO
 	
 #if defined(PHOTODEGRADATION)
-	 
-	 ! Add in all the code here for each different DOC
-  ! still need these "colors" formuilations for the TSS scaling. dont quite understand this
-  
+
   ! B Clark Commented out on June 2017;
   !updated specific absorption spectra from Rose,Neale, Tzortziou et al., (L&O in prep) that do not require the coefficients from Gallegos model
   ! Can now use the specific absorption and the concentrations of each absorbing constituent directly
@@ -1037,15 +919,6 @@ CALL PHOTOCHEMISTRY
 	 
      KESS(I,k) = OWQ(COLOR(I,k),TOTCHL(I,K),TURB(I,k),DEPTHKE,AVREFCOS)  
  
-! ASSIGN SURFACE ATTENUATION TO SUB-SURFACE CELLS
-!RGl - why is Kess the same in the wc?
-!WLong - because KESS is coefficient in front of vertical coordinate (depth from surface)
-!        for an exponentially decaying light field, this will be a constant
-!        for vertically homogeneous water column. Not true if CDOM and CHLA etc has vertical distribution
-!        
-     !DO K=2,KBM1
-     !  KESS(I,K) = KESS(I,1)
-     !ENDDO
 	 
 	 ENDDO
    ENDDO
@@ -1087,6 +960,34 @@ CALL PHOTOCHEMISTRY
    
    RETURN
    END SUBROUTINE LGHT_ATTN
+
+  SUBROUTINE KD_LEE(SZA,a_total,beta_tss,KD_out)
+    !This is the Kd light attenuation model based on Lee et al.,
+	!SZA is the solar zenith angle in degrees, can take the declination value and multiply by 180
+	!a_total is the total absorption form all in water consituents
+	!beta_tss is the scattering due to total suspended sediment
+    REAL(SP) :: m0=0.0
+	REAL(SP) :: m1=4.259
+	REAL(SP) :: m2=0.52
+    REAL(SP) :: m3=-10.80
+    real(sp) ::m4,m5,m6!these are used for the inside of paranthesis
+
+    REAL(SP), INTENT(IN):: SZA
+    REAL(SP), INTENT(IN):: a_total
+    REAL(SP), INTENT(IN):: beta_tss
+    REAL(SP), INTENT(OUT):: KD_out
+
+    !Calculate KD
+        m0=1.0+0.005*(90-SZA)
+        m4=m3*a_total
+        m5=1.-m2*exp(m4)
+       !Kd = m0.* a_total + m1 * (1.0 - m2 * exp( m3 .* a_total)) .* beta_tss;
+
+    KD_out=m0 * a_total + m1 * m5 * beta_tss
+
+	RETURN
+
+  END SUBROUTINE KD_LEE
 
    
 END MODULE MOD_OWQ

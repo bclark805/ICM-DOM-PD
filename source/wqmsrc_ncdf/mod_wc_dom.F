@@ -161,6 +161,8 @@ REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: WC_NCDOC1,WC_NCDOC2,WC_NCDOC3,   &    !
 										 WC_NCDOP1,WC_NCDOP2,WC_NCDOP3,   &    ! Water column colored dissolved organic phosphorus g P/m^3
 										 WC_CDOP1,WC_CDOP2,WC_CDOP3            ! Water column colored dissolved organic phosphorus g P/m^3''
 
+REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: XFLUX_NCDOC1,XFLUX_NCDOC2,XFLUX_NCDOC3,   &    ! Water Column Non-COlored Dissolved organic Carbon flxu g C/m^3 s^-1
+										 XFLUX_CDOC1,XFLUX_CDOC2,XFLUX_CDOC3									 
 REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: CP1C, CP2C, CP3C	! Carbon algal basal matabolism coefficient, calculated in wqm_kin and passed back to solve DOC here									 
 REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: NP1, NP2, NP3   ! ALGAL 1 AND 2 PRODUCTION OF DON	! CALCULATED IN MOD KIN
 REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: PP1, PP2, PP3  ! ALGAL PRODUCTION OF DOP  ! CALCULATED IN MOD KIN
@@ -173,6 +175,15 @@ REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: DTWNCDOC1,DTWNCDOC2,DTWNCDOC3,  &   ! D
 										 DTWCDON1,DTWCDON2,DTWCDON3,	  &
 										 DTWNCDOP1,DTWNCDOP2,DTWNCDOP3,  &
 										 DTWCDOP1,DTWCDOP2,DTWCDOP3
+
+Real(SP), ALLOCATABLE, DIMENSION(:,:) :: MyVolumeTM1  ! previous time step volume
+
+REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: DTWNCDOC1_out,DTWNCDOC2_out,DTWNCDOC3_out,  &   ! DT ORGANICS integrated over time for calculating the budget
+							             DTWCDOC1_out,DTWCDOC2_out,DTWCDOC3_out,     &
+										 DTWNCDON1_out,DTWNCDON2_out,DTWNCDON3_out,  &
+										 DTWCDON1_out,DTWCDON2_out,DTWCDON3_out,	  &
+										 DTWNCDOP1_out,DTWNCDOP2_out,DTWNCDOP3_out,  &
+										 DTWCDOP1_out,DTWCDOP2_out,DTWCDOP3_out										 
 										 
 REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: DTWNCDOC1_GL,DTWNCDOC2_GL,DTWNCDOC3_GL,  &   ! DT ORGANICS, ADD INTO TOTAL POOL AND TIME INTEGRATE
 							             DTWCDOC1_GL,DTWCDOC2_GL,DTWCDOC3_GL,     &
@@ -193,7 +204,8 @@ REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: NtoC_C3, & ! colored CDON3 to CDOC3 rat
 										 NtoC_C1  ! Colored CDON1 to CDOC1 ratio
 
 #if defined(PHOTODEGRADATION)
-
+ 
+   INTEGER  :: NWAVELx=417 , j
    REAL(SP), ALLOCATABLE :: ICDOM_abs(:,:,:,:) ,& ! The absorbance of cdom 1,2,3 for each wavelength, passed back from the OWQ mod (MTLOC,KBM1,NWAVEL,3)  
 							TOTAL_CDOM_ABS(:,:,:), &! The total absorption spectra for the 3 classes of CDOM summed (MTLOC,KBM1,NWAVEL)					! m^-1
 							N_photons(:,:,:,:)   !Loss in photon flux (mols Quanta/m^2/s) absorbed by each CDOM at each wavelength (MTLOC, KBM1, NWAVEL, 3)
@@ -233,11 +245,9 @@ REAL(SP), ALLOCATABLE, DIMENSION(:,:) :: NtoC_C3, & ! colored CDON3 to CDOC3 rat
  
  
  
- 
+REAL(SP) :: MyLayerThickness 
 #endif 
  
-			 INTEGER  :: NWAVELx=417 , j
-			 
 			 
 !allocate all the variables
 CONTAINS
@@ -306,13 +316,19 @@ SUBROUTINE WC_DOM_ALLOCATE
 	!ALLOCATE(FRP1SZ(MTLOC,KBM1)) ! DOP CONSUMED BY ZOOPLANKTON
 	!ALLOCATE(FRP2SZ(MTLOC,KBM1))
 	ALLOCATE(WC_NCDOC1(0:MTLOC,KBM1)); WC_NCDOC1 = 0.0 
-
 	ALLOCATE(WC_NCDOC2(0:MTLOC,KBM1)); WC_NCDOC2 = 0.0 
 	ALLOCATE(WC_NCDOC3(0:MTLOC,KBM1)); WC_NCDOC3 = 0.0 
 	ALLOCATE(WC_CDOC1(0:MTLOC,KBM1)); WC_CDOC1 = 0.0 
 	ALLOCATE(WC_CDOC2(0:MTLOC,KBM1)); WC_CDOC2 = 0.0 
 	ALLOCATE(WC_CDOC3(0:MTLOC,KBM1)); WC_CDOC3 = 0.0 
-	
+
+	ALLOCATE(XFLUX_NCDOC1(0:MTLOC,KBM1)); XFLUX_NCDOC1 = 0.0 
+	ALLOCATE(XFLUX_NCDOC2(0:MTLOC,KBM1)); XFLUX_NCDOC2 = 0.0 
+	ALLOCATE(XFLUX_NCDOC3(0:MTLOC,KBM1)); XFLUX_NCDOC3 = 0.0 
+	ALLOCATE(XFLUX_CDOC1(0:MTLOC,KBM1)); XFLUX_CDOC1 = 0.0 
+	ALLOCATE(XFLUX_CDOC2(0:MTLOC,KBM1)); XFLUX_CDOC2 = 0.0 
+	ALLOCATE(XFLUX_CDOC3(0:MTLOC,KBM1)); XFLUX_CDOC3 = 0.0 
+
 	ALLOCATE(WC_NCDON1(0:MTLOC,KBM1)); WC_NCDON1 = 0.0
 	ALLOCATE(WC_NCDON2(0:MTLOC,KBM1)); WC_NCDON2 = 0.0
 	ALLOCATE(WC_NCDON3(0:MTLOC,KBM1)); WC_NCDON3 = 0.0
@@ -327,28 +343,48 @@ SUBROUTINE WC_DOM_ALLOCATE
 	ALLOCATE(WC_CDOP2(0:MTLOC,KBM1)); WC_CDOP2 = 0.0
 	ALLOCATE(WC_CDOP3(0:MTLOC,KBM1)); WC_CDOP3 = 0.0
 	
-	ALLOCATE(DTWNCDOC1(1:MTLOC,KBM1)); DTWNCDOC1 = 0.0
-	ALLOCATE(DTWNCDOC2(1:MTLOC,KBM1)); DTWNCDOC2 = 0.0
-	ALLOCATE(DTWNCDOC3(1:MTLOC,KBM1)); DTWNCDOC3 = 0.0
-	ALLOCATE(DTWCDOC1(1:MTLOC,KBM1)); DTWCDOC1 = 0.0
-	ALLOCATE(DTWCDOC2(1:MTLOC,KBM1)); DTWCDOC2 = 0.0
-	ALLOCATE(DTWCDOC3(1:MTLOC,KBM1)); DTWCDOC3 = 0.0
+	ALLOCATE(DTWNCDOC1(0:MTLOC,KBM1)); DTWNCDOC1 = 0.0
+	ALLOCATE(DTWNCDOC2(0:MTLOC,KBM1)); DTWNCDOC2 = 0.0
+	ALLOCATE(DTWNCDOC3(0:MTLOC,KBM1)); DTWNCDOC3 = 0.0
+	ALLOCATE(DTWCDOC1(0:MTLOC,KBM1)); DTWCDOC1 = 0.0
+	ALLOCATE(DTWCDOC2(0:MTLOC,KBM1)); DTWCDOC2 = 0.0
+	ALLOCATE(DTWCDOC3(0:MTLOC,KBM1)); DTWCDOC3 = 0.0
 	
-	ALLOCATE(DTWNCDON1(1:MTLOC,KBM1)); DTWNCDON1 = 0.0
-	ALLOCATE(DTWNCDON2(1:MTLOC,KBM1)); DTWNCDON2 = 0.0
-	ALLOCATE(DTWNCDON3(1:MTLOC,KBM1)); DTWNCDON3 = 0.0
-	ALLOCATE(DTWCDON1(1:MTLOC,KBM1)); DTWCDON1 = 0.0
-	ALLOCATE(DTWCDON2(1:MTLOC,KBM1)); DTWCDON2 = 0.0
-	ALLOCATE(DTWCDON3(1:MTLOC,KBM1)); DTWCDON3 = 0.0
+	ALLOCATE(DTWNCDON1(0:MTLOC,KBM1)); DTWNCDON1 = 0.0
+	ALLOCATE(DTWNCDON2(0:MTLOC,KBM1)); DTWNCDON2 = 0.0
+	ALLOCATE(DTWNCDON3(0:MTLOC,KBM1)); DTWNCDON3 = 0.0
+	ALLOCATE(DTWCDON1(0:MTLOC,KBM1)); DTWCDON1 = 0.0
+	ALLOCATE(DTWCDON2(0:MTLOC,KBM1)); DTWCDON2 = 0.0
+	ALLOCATE(DTWCDON3(0:MTLOC,KBM1)); DTWCDON3 = 0.0
 	
-	ALLOCATE(DTWNCDOP1(1:MTLOC,KBM1)); DTWNCDOP1 = 0.0
-	ALLOCATE(DTWNCDOP2(1:MTLOC,KBM1)); DTWNCDOP2 = 0.0
-	ALLOCATE(DTWNCDOP3(1:MTLOC,KBM1)); DTWNCDOP3 = 0.0
-	ALLOCATE(DTWCDOP1(1:MTLOC,KBM1)); DTWCDOP1 = 0.0
-	ALLOCATE(DTWCDOP2(1:MTLOC,KBM1)); DTWCDOP2 = 0.0
-	ALLOCATE(DTWCDOP3(1:MTLOC,KBM1)); DTWCDOP3 = 0.0
+	ALLOCATE(DTWNCDOP1(0:MTLOC,KBM1)); DTWNCDOP1 = 0.0
+	ALLOCATE(DTWNCDOP2(0:MTLOC,KBM1)); DTWNCDOP2 = 0.0
+	ALLOCATE(DTWNCDOP3(0:MTLOC,KBM1)); DTWNCDOP3 = 0.0
+	ALLOCATE(DTWCDOP1(0:MTLOC,KBM1)); DTWCDOP1 = 0.0
+	ALLOCATE(DTWCDOP2(0:MTLOC,KBM1)); DTWCDOP2 = 0.0
+	ALLOCATE(DTWCDOP3(0:MTLOC,KBM1)); DTWCDOP3 = 0.0
 	
+	ALLOCATE(DTWNCDOC1_out(1:MTLOC,KBM1)); DTWNCDOC1_out = 0.0
+	ALLOCATE(DTWNCDOC2_out(1:MTLOC,KBM1)); DTWNCDOC2_out = 0.0
+	ALLOCATE(DTWNCDOC3_out(1:MTLOC,KBM1)); DTWNCDOC3_out = 0.0
+	ALLOCATE(DTWCDOC1_out(1:MTLOC,KBM1)); DTWCDOC1_out = 0.0
+	ALLOCATE(DTWCDOC2_out(1:MTLOC,KBM1)); DTWCDOC2_out = 0.0
+	ALLOCATE(DTWCDOC3_out(1:MTLOC,KBM1)); DTWCDOC3_out = 0.0
 	
+	ALLOCATE(DTWNCDON1_out(1:MTLOC,KBM1)); DTWNCDON1_out = 0.0
+	ALLOCATE(DTWNCDON2_out(1:MTLOC,KBM1)); DTWNCDON2_out = 0.0
+	ALLOCATE(DTWNCDON3_out(1:MTLOC,KBM1)); DTWNCDON3_out = 0.0
+	ALLOCATE(DTWCDON1_out(1:MTLOC,KBM1)); DTWCDON1_out = 0.0
+	ALLOCATE(DTWCDON2_out(1:MTLOC,KBM1)); DTWCDON2_out = 0.0
+	ALLOCATE(DTWCDON3_out(1:MTLOC,KBM1)); DTWCDON3_out = 0.0
+	
+	ALLOCATE(DTWNCDOP1_out(1:MTLOC,KBM1)); DTWNCDOP1_out = 0.0
+	ALLOCATE(DTWNCDOP2_out(1:MTLOC,KBM1)); DTWNCDOP2_out = 0.0
+	ALLOCATE(DTWNCDOP3_out(1:MTLOC,KBM1)); DTWNCDOP3_out = 0.0
+	ALLOCATE(DTWCDOP1_out(1:MTLOC,KBM1)); DTWCDOP1_out = 0.0
+	ALLOCATE(DTWCDOP2_out(1:MTLOC,KBM1)); DTWCDOP2_out = 0.0
+	ALLOCATE(DTWCDOP3_out(1:MTLOC,KBM1)); DTWCDOP3_out = 0.0
+		
 	ALLOCATE(DTWNCDOC1_GL(MGL,KBM1)); DTWNCDOC1_GL = 0.0
 	ALLOCATE(DTWNCDOC2_GL(MGL,KBM1)); DTWNCDOC2_GL = 0.0
 	ALLOCATE(DTWNCDOC3_GL(MGL,KBM1)); DTWNCDOC3_GL = 0.0
@@ -376,7 +412,9 @@ SUBROUTINE WC_DOM_ALLOCATE
 	ALLOCATE(DTLPOC_GL(MGL,KBM1)); DTLPOC_GL = 0.0
 	ALLOCATE(DTLPON_GL(MGL,KBM1)); DTLPON_GL = 0.0
 	ALLOCATE(DTRPON_GL(MGL,KBM1)); DTRPON_GL = 0.0
-						 
+					
+	
+	ALLOCATE(MyVolumeTM1(MTLOC,KBM1));MyVolumeTM1=0.0
 	
 	ALLOCATE(CP1C(MTLOC,KBM1)); CP1C = 0.0
 	ALLOCATE(CP2C(MTLOC,KBM1)); CP2C = 0.0
@@ -395,9 +433,9 @@ SUBROUTINE WC_DOM_ALLOCATE
     ALLOCATE(MNLDOC2(MTLOC,KBM1)); MNLDOC2=0.0
     ALLOCATE(MNLDOC3(MTLOC,KBM1)); MNLDOC3=0.0
 	
-	ALLOCATE(MNLDOC1_OUT(MGL,KBM1)); MNLDOC1_OUT=0.0
-    ALLOCATE(MNLDOC2_OUT(MGL,KBM1)); MNLDOC2_OUT=0.0
-    ALLOCATE(MNLDOC3_OUT(MGL,KBM1)); MNLDOC3_OUT=0.0
+	ALLOCATE(MNLDOC1_OUT(MTLOC,KBM1)); MNLDOC1_OUT=0.0
+    ALLOCATE(MNLDOC2_OUT(MTLOC,KBM1)); MNLDOC2_OUT=0.0
+    ALLOCATE(MNLDOC3_OUT(MTLOC,KBM1)); MNLDOC3_OUT=0.0
 	
     ALLOCATE(MNLDOC1_GL(MGL,KBM1)); MNLDOC1_GL=0.0
     ALLOCATE(MNLDOC2_GL(MGL,KBM1)); MNLDOC2_GL=0.0
@@ -481,6 +519,8 @@ END SUBROUTINE WC_DOM_ALLOCATE
 ! Deallocate all the variables
 SUBROUTINE WC_DOM_DEALLOCATE
 
+	IF(ALLOCATED(MyVolumeTM1)) DEALLOCATE(MyVolumeTM1)
+	
     IF(ALLOCATED(KDOC1)) DEALLOCATE(KDOC1)
 	IF(ALLOCATED(KDOC2)) DEALLOCATE(KDOC2)
 	IF(ALLOCATED(KDOC3)) DEALLOCATE(KDOC3)
@@ -522,7 +562,14 @@ SUBROUTINE WC_DOM_DEALLOCATE
 	IF(ALLOCATED(WC_CDOC1)) DEALLOCATE(WC_CDOC1)
 	IF(ALLOCATED(WC_CDOC2)) DEALLOCATE(WC_CDOC2)
 	IF(ALLOCATED(WC_CDOC3)) DEALLOCATE(WC_CDOC3)
-					
+
+	IF(ALLOCATED(XFLUX_NCDOC1)) DEALLOCATE(XFLUX_NCDOC1)
+	IF(ALLOCATED(XFLUX_NCDOC2)) DEALLOCATE(XFLUX_NCDOC2)
+	IF(ALLOCATED(XFLUX_NCDOC3)) DEALLOCATE(XFLUX_NCDOC3)
+	IF(ALLOCATED(XFLUX_CDOC1)) DEALLOCATE(XFLUX_CDOC1)
+	IF(ALLOCATED(XFLUX_CDOC2)) DEALLOCATE(XFLUX_CDOC2)
+	IF(ALLOCATED(XFLUX_CDOC3)) DEALLOCATE(XFLUX_CDOC3)
+		
 	IF(ALLOCATED(WC_NCDON1)) DEALLOCATE(WC_NCDON1)
 	IF(ALLOCATED(WC_NCDON2)) DEALLOCATE(WC_NCDON2)
 	IF(ALLOCATED(WC_NCDON3)) DEALLOCATE(WC_NCDON3)
@@ -557,6 +604,28 @@ SUBROUTINE WC_DOM_DEALLOCATE
 	IF(ALLOCATED(DTWCDOP1)) DEALLOCATE(DTWCDOP1)
 	IF(ALLOCATED(DTWCDOP2)) DEALLOCATE(DTWCDOP2)
 	IF(ALLOCATED(DTWCDOP3)) DEALLOCATE(DTWCDOP3)
+	
+    IF(ALLOCATED(DTWNCDOC1_out)) DEALLOCATE(DTWNCDOC1_out)
+	IF(ALLOCATED(DTWNCDOC2_out)) DEALLOCATE(DTWNCDOC2_out)
+	IF(ALLOCATED(DTWNCDOC3_out)) DEALLOCATE(DTWNCDOC3_out)
+	IF(ALLOCATED(DTWCDOC1_out)) DEALLOCATE(DTWCDOC1_out)
+	IF(ALLOCATED(DTWCDOC2_out)) DEALLOCATE(DTWCDOC2_out)
+	IF(ALLOCATED(DTWCDOC3_out)) DEALLOCATE(DTWCDOC3_out)
+	
+	IF(ALLOCATED(DTWNCDON1_out)) DEALLOCATE(DTWNCDON1_out)
+	IF(ALLOCATED(DTWNCDON2_out)) DEALLOCATE(DTWNCDON2_out)
+	IF(ALLOCATED(DTWNCDON3_out)) DEALLOCATE(DTWNCDON3_out)
+	IF(ALLOCATED(DTWCDON1_out)) DEALLOCATE(DTWCDON1_out)
+	IF(ALLOCATED(DTWCDON2_out)) DEALLOCATE(DTWCDON2_out)
+	IF(ALLOCATED(DTWCDON3_out)) DEALLOCATE(DTWCDON3_out)
+	
+	IF(ALLOCATED(DTWNCDOP1_out)) DEALLOCATE(DTWNCDOP1_out)
+	IF(ALLOCATED(DTWNCDOP2_out)) DEALLOCATE(DTWNCDOP2_out)
+	IF(ALLOCATED(DTWNCDOP3_out)) DEALLOCATE(DTWNCDOP3_out)
+	IF(ALLOCATED(DTWCDOP1_out)) DEALLOCATE(DTWCDOP1_out)
+	IF(ALLOCATED(DTWCDOP2_out)) DEALLOCATE(DTWCDOP2_out)
+	IF(ALLOCATED(DTWCDOP3_out)) DEALLOCATE(DTWCDOP3_out)	
+	
 
 	IF(ALLOCATED(DTWNCDOC1_GL)) DEALLOCATE(DTWNCDOC1_GL)
 	IF(ALLOCATED(DTWNCDOC2_GL)) DEALLOCATE(DTWNCDOC2_GL)
@@ -667,17 +736,15 @@ SUBROUTINE WC_DOM_DEALLOCATE
 	
    IF(ALLOCATED(DPD31N)) DEALLOCATE(DPD31N)
    IF(ALLOCATED(DPD32N)) DEALLOCATE(DPD32N)
-   IF(ALLOCATED(DPD30N))  DEALLOCATE(DPD30N)
+   IF(ALLOCATED(DPD30N)) DEALLOCATE(DPD30N)
    IF(ALLOCATED(DPD3NN)) DEALLOCATE(DPD3NN)
    IF(ALLOCATED(DPD21N)) DEALLOCATE(DPD21N)	  
    IF(ALLOCATED(DPD20N)) DEALLOCATE(DPD20N)	  
    IF(ALLOCATED(DPD2NN)) DEALLOCATE(DPD2NN)
    IF(ALLOCATED(DPD10N)) DEALLOCATE(DPD10N)  
    IF(ALLOCATED(DPD1NN)) DEALLOCATE(DPD1NN)   
- 
-   
+
 #endif
-   
    
    IF(ALLOCATED(NtoC_C3)) DEALLOCATE(NtoC_C3)
    IF(ALLOCATED(NtoC_C2)) DEALLOCATE(NtoC_C2)
@@ -687,8 +754,8 @@ END SUBROUTINE WC_DOM_DEALLOCATE
 
 SUBROUTINE WC_DOM_INPUT
 ! read all the parameters from an input file
-
- CHARACTER(LEN=120) :: WCDOM_FILEin,APQY_filein
+! USE MOD_WQM, ONLY: NCP,NCVFs,XFLUX_IA, XFLUX_IB, SIGNx, XFLUX_OUT,EDGLINE_FLUX
+ CHARACTER(LEN=120) :: WCDOM_FILEin,APQY_filein,Xflux_filein
  real(SP) :: sanity!, summed_up, tol
  INTEGER :: ingood
  
@@ -820,7 +887,6 @@ ENDIF
 	close(3457)
 		
 #endif
-	
 	
 	
 #if defined(MULTIPROCESSOR)
@@ -1273,6 +1339,8 @@ USE MOD_HYDROVARS, ONLY : ART1  ! area of node control volume
 !write(*,*)'photodeg is on'
      DO I = 1, MLOC
 	   DO K = 1, KBM1
+	   
+	   MyLayerThickness=(D(I)*DZ(K))
                       ! We can integrate it over the entire spectra and get a wavelength dependent CDOMx loss to photodegradation and then sum that up to get the total loss f
 					  ! from each pooll
 	  !    DO J = 1,NWAVEL   ! Loop over all wavelengths to get the integrated spectral apparent quantum yield for each waveband therefore total loss of DOM
@@ -1315,20 +1383,20 @@ USE MOD_HYDROVARS, ONLY : ART1  ! area of node control volume
 			ENDDO
 													
 													
-			PHOTOCHEM_DOC_ACCUM(I,K,1) = DPD32/(D(I)*DZ(K))  ! g C m^-2 s^-1 --> g C m^-3 s^-1
-			PHOTOCHEM_DOC_ACCUM(I,K,2) = DPD31/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,3) = DPD30 /(D(I)*DZ(K))	
-			PHOTOCHEM_DOC_ACCUM(I,K,4) = DPD3N/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,5) = DPD21 /(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,6) = DPD20/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,7) = DPD2N/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,8) = DPD10/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,9) = DPD1N/(D(I)*DZ(K))
+			PHOTOCHEM_DOC_ACCUM(I,K,1) = DPD32/MyLayerThickness  ! g C m^-2 s^-1 --> g C m^-3 s^-1
+			PHOTOCHEM_DOC_ACCUM(I,K,2) = DPD31/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,3) = DPD30 /MyLayerThickness	
+			PHOTOCHEM_DOC_ACCUM(I,K,4) = DPD3N/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,5) = DPD21 /MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,6) = DPD20/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,7) = DPD2N/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,8) = DPD10/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,9) = DPD1N/MyLayerThickness
 								
 								
 		! convert from g C m^-3 s^-1		to g C m^-3 d^-1 for output
 																	
-		    PHOTOCHEM_DOC_ACCUM(I,K,:)= PHOTOCHEM_DOC_ACCUM(I,K,:)*86400
+		    !PHOTOCHEM_DOC_ACCUM(I,K,:)= PHOTOCHEM_DOC_ACCUM(I,K,:)
 															
 			! Convert changes in carbon to changes in nitrogen using a nitrogen to carbon ratio
 			! for photobleaching, rather than a variable ratio based on the total DON:DOC concentration
@@ -1352,59 +1420,53 @@ USE MOD_HYDROVARS, ONLY : ART1  ! area of node control volume
 			DPD1NN(I,K)=DPD1N*NtoC_C1(I,K)
 			DPD10N(I,K)=DPD10*NtoC_C1(I,K)
 			
-			PHOTOCHEM_DOC_ACCUM(I,K,10) = DPD32N(I,K)/(D(I)*DZ(K))  ! g C m^-2 s^-1 --> g C m^-3 s^-1
-			PHOTOCHEM_DOC_ACCUM(I,K,11) = DPD31N(I,K)/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,12) = DPD30N(I,K)/(D(I)*DZ(K))	
-			PHOTOCHEM_DOC_ACCUM(I,K,13) = DPD3NN(I,K)/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,14) = DPD21N(I,K)/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,15) = DPD20N(I,K)/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,16) = DPD2NN(I,K)/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,17) = DPD10N(I,K)/(D(I)*DZ(K))
-			PHOTOCHEM_DOC_ACCUM(I,K,18) = DPD1NN(I,K)/(D(I)*DZ(K))
+			PHOTOCHEM_DOC_ACCUM(I,K,10) = DPD32N(I,K)/MyLayerThickness  ! g C m^-2 s^-1 --> g C m^-3 s^-1
+			PHOTOCHEM_DOC_ACCUM(I,K,11) = DPD31N(I,K)/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,12) = DPD30N(I,K)/MyLayerThickness	
+			PHOTOCHEM_DOC_ACCUM(I,K,13) = DPD3NN(I,K)/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,14) = DPD21N(I,K)/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,15) = DPD20N(I,K)/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,16) = DPD2NN(I,K)/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,17) = DPD10N(I,K)/MyLayerThickness
+			PHOTOCHEM_DOC_ACCUM(I,K,18) = DPD1NN(I,K)/MyLayerThickness
 			
-			
-			
-			
-			
-			
-			
-			
-			
-			
+		! convert from g  m^-3 s^-1		to g  m^-3 d^-1 for output
+																	
+		    PHOTOCHEM_DOC_ACCUM(I,K,:)= PHOTOCHEM_DOC_ACCUM(I,K,:)*86400.
 
-	   	      DTWCDOC3(I,K) = DTWCDOC3(I,K) - DPD32 /(D(I)*DZ(K)) & !SUM(APQY31 * N_photons(I,K,:,3)) &   !integrated loss to CDOC1
-											- DPD31 /(D(I)*DZ(K)) & !SUM(APQY32 * N_photons(I,K,:,3)) &    ! loss to CDOC2
-											- DPD30 /(D(I)*DZ(K)) & !SUM(APQY30 * N_photons(I,K,:,3))   &   ! loss to DIC		
-											- DPD3N /(D(I)*DZ(K))   !SUM(APQY3N * N_photons(I,K,:,3))    ! loss to NCDOC  ! Don't know if this pathway exists, really, because there is inherent color loss in the loss to the less colored pools...
+	   	      DTWCDOC3(I,K) = DTWCDOC3(I,K) - DPD32 /MyLayerThickness & !SUM(APQY31 * N_photons(I,K,:,3)) &   !integrated loss to CDOC1
+											- DPD31 /MyLayerThickness & !SUM(APQY32 * N_photons(I,K,:,3)) &    ! loss to CDOC2
+											- DPD30 /MyLayerThickness & !SUM(APQY30 * N_photons(I,K,:,3))   &   ! loss to DIC		
+											- DPD3N /MyLayerThickness   !SUM(APQY3N * N_photons(I,K,:,3))    ! loss to NCDOC  ! Don't know if this pathway exists, really, because there is inherent color loss in the loss to the less colored pools...
 
 	   
-			  DTWCDOC2(I,K) = DTWCDOC2(I,K) - DPD21  /(D(I)*DZ(K)) &  !SUM(APQY21 * N_photons(I,K,:,2) )  &!
-										    - DPD20  /(D(I)*DZ(K)) &  !SUM(APQY20 * N_photons(I,K,:,2) )   &!
-										    - DPD2N  /(D(I)*DZ(K)) &  !SUM(APQY2N * N_photons(I,K,:,2) )       &      ! loss to NCDOC
-										    + DPD32  /(D(I)*DZ(K))    !SUM(APQY32 * N_photons(I,K,:,3))    ! gain from CDOM 3
+			  DTWCDOC2(I,K) = DTWCDOC2(I,K) - DPD21  /MyLayerThickness &  !SUM(APQY21 * N_photons(I,K,:,2) )  &!
+										    - DPD20  /MyLayerThickness &  !SUM(APQY20 * N_photons(I,K,:,2) )   &!
+										    - DPD2N  /MyLayerThickness &  !SUM(APQY2N * N_photons(I,K,:,2) )       &      ! loss to NCDOC
+										    + DPD32  /MyLayerThickness    !SUM(APQY32 * N_photons(I,K,:,3))    ! gain from CDOM 3
 										 
-			  DTWCDOC1(I,K) = DTWCDOC1(I,K) + DPD31  /(D(I)*DZ(K)) &  !SUM(APQY31 * N_photons(I,K,:,3)) &!
-										    + DPD21  /(D(I)*DZ(K)) &  !SUM(APQY21 * N_photons(I,K,:,2))	       &		!
-										    - DPD10  /(D(I)*DZ(K)) &  !SUM(APQY10 * N_photons(I,K,:,1))         &!
-										    - DPD1N  /(D(I)*DZ(K))   ! SUM(APQY1N * N_photons(I,K,:,1))            ! loss to NCDOC
+			  DTWCDOC1(I,K) = DTWCDOC1(I,K) + DPD31  /MyLayerThickness &  !SUM(APQY31 * N_photons(I,K,:,3)) &!
+										    + DPD21  /MyLayerThickness &  !SUM(APQY21 * N_photons(I,K,:,2))	       &		!
+										    - DPD10  /MyLayerThickness &  !SUM(APQY10 * N_photons(I,K,:,1))         &!
+										    - DPD1N  /MyLayerThickness   ! SUM(APQY1N * N_photons(I,K,:,1))            ! loss to NCDOC
 											
 			! all losses to the non-colored pools get fractionated after their transformations
 											
 ! THE IMPACT of PD on transformations from colored ---> non-colored
 
 	!NCDOC1											
-			DTWNCDOC1(I,K) = DTWNCDOC1(I,K) + DPD3N * FPDC31 /(D(I)*DZ(K))&  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC31     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored biolabile)
-											+ DPD2N * FPDC21 /(D(I)*DZ(K))&  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC21	& ! same as above but 2 to 1 
-											+ DPD1N * FPDC11/(D(I)*DZ(K))    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC11   ! from LMW colored to bio-labile
+			DTWNCDOC1(I,K) = DTWNCDOC1(I,K) + DPD3N * FPDC31 /MyLayerThickness&  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC31     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored biolabile)
+											+ DPD2N * FPDC21 /MyLayerThickness&  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC21	& ! same as above but 2 to 1 
+											+ DPD1N * FPDC11/MyLayerThickness    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC11   ! from LMW colored to bio-labile
 	!NCDOC2										
-			DTWNCDOC2(I,K) = DTWNCDOC2(I,K) + DPD3N * FPDC32/(D(I)*DZ(K))  &  ! SUM(APQY3N * N_photons(I,K,:,3)) * FPDC32     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored semi-labile)
-											+ DPD2N * FPDC22/(D(I)*DZ(K))&  !    SUM(APQY2N * N_photons(I,K,:,2))* FPDC22	& ! same as above but 2 to 1 
-											+ DPD1N * FPDC12/(D(I)*DZ(K))    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC12   ! from LMW colored to bio-labile											
+			DTWNCDOC2(I,K) = DTWNCDOC2(I,K) + DPD3N * FPDC32/MyLayerThickness  &  ! SUM(APQY3N * N_photons(I,K,:,3)) * FPDC32     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored semi-labile)
+											+ DPD2N * FPDC22/MyLayerThickness&  !    SUM(APQY2N * N_photons(I,K,:,2))* FPDC22	& ! same as above but 2 to 1 
+											+ DPD1N * FPDC12/MyLayerThickness    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC12   ! from LMW colored to bio-labile											
 	
 	!NCDOC3
-			DTWNCDOC3(I,K) = DTWNCDOC3(I,K) + DPD3N * FPDC33/(D(I)*DZ(K)) &  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC33     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored refractory)
-											+ DPD2N * FPDC23/(D(I)*DZ(K)) &  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC23	& ! same as above but 2 to 1 
-											+ DPD1N * FPDC13/(D(I)*DZ(K))    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC13   ! from LMW colored to bio-labile											
+			DTWNCDOC3(I,K) = DTWNCDOC3(I,K) + DPD3N * FPDC33/MyLayerThickness &  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC33     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored refractory)
+											+ DPD2N * FPDC23/MyLayerThickness &  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC23	& ! same as above but 2 to 1 
+											+ DPD1N * FPDC13/MyLayerThickness    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC13   ! from LMW colored to bio-labile											
 					
 		END DO
 	END DO	
@@ -1574,39 +1636,42 @@ ENDIF   ! DON_flag
 IF(PHOTODEG) THEN
     DO I=1,MLOC
 	  DO K=1,KBM1
-	   	      DTWCDON3(I,K) = DTWCDON3(I,K) - DPD32N(I,K) /(D(I)*DZ(K)) & !SUM(APQY31 * N_photons(I,K,:,3)) &   !integrated loss to CDOC1
-											- DPD31N(I,K) /(D(I)*DZ(K)) & !SUM(APQY32 * N_photons(I,K,:,3)) &    ! loss to CDOC2
-											- DPD30N(I,K) /(D(I)*DZ(K)) & !SUM(APQY30 * N_photons(I,K,:,3))   &   ! loss to DIC		
-											- DPD3NN(I,K) /(D(I)*DZ(K))   !SUM(APQY3N * N_photons(I,K,:,3))    ! loss to NCDOC  ! Don't know if this pathway exists, really, because there is inherent color loss in the loss to the less colored pools...
+	  
+			MyLayerThickness=(D(I)*DZ(K))
+			
+	   	      DTWCDON3(I,K) = DTWCDON3(I,K) - DPD32N(I,K) /MyLayerThickness & !SUM(APQY31 * N_photons(I,K,:,3)) &   !integrated loss to CDOC1
+											- DPD31N(I,K) /MyLayerThickness & !SUM(APQY32 * N_photons(I,K,:,3)) &    ! loss to CDOC2
+											- DPD30N(I,K) /MyLayerThickness & !SUM(APQY30 * N_photons(I,K,:,3))   &   ! loss to DIC		
+											- DPD3NN(I,K) /MyLayerThickness   !SUM(APQY3N * N_photons(I,K,:,3))    ! loss to NCDOC  ! Don't know if this pathway exists, really, because there is inherent color loss in the loss to the less colored pools...
 
 	   
-			  DTWCDON2(I,K) = DTWCDON2(I,K) - DPD21N(I,K)  /(D(I)*DZ(K)) &  !SUM(APQY21 * N_photons(I,K,:,2) )  &!
-										    - DPD20N(I,K)  /(D(I)*DZ(K)) &  !SUM(APQY20 * N_photons(I,K,:,2) )   &!
-										    - DPD2NN(I,K)  /(D(I)*DZ(K)) &  !SUM(APQY2N * N_photons(I,K,:,2) )       &      ! loss to NCDOC
-										    + DPD32N(I,K)  /(D(I)*DZ(K))    !SUM(APQY32 * N_photons(I,K,:,3))    ! gain from CDOM 3
+			  DTWCDON2(I,K) = DTWCDON2(I,K) - DPD21N(I,K)  /MyLayerThickness &  !SUM(APQY21 * N_photons(I,K,:,2) )  &!
+										    - DPD20N(I,K)  /MyLayerThickness &  !SUM(APQY20 * N_photons(I,K,:,2) )   &!
+										    - DPD2NN(I,K)  /MyLayerThickness &  !SUM(APQY2N * N_photons(I,K,:,2) )       &      ! loss to NCDOC
+										    + DPD32N(I,K)  /MyLayerThickness    !SUM(APQY32 * N_photons(I,K,:,3))    ! gain from CDOM 3
 										 
-			  DTWCDON1(I,K) = DTWCDON1(I,K) + DPD31N(I,K)  /(D(I)*DZ(K)) &  !SUM(APQY31 * N_photons(I,K,:,3)) &!
-										    + DPD21N(I,K)  /(D(I)*DZ(K)) &  !SUM(APQY21 * N_photons(I,K,:,2))	       &		!
-										    - DPD10N(I,K) /(D(I)*DZ(K)) &  !SUM(APQY10 * N_photons(I,K,:,1))         &!
-										    - DPD1NN(I,K)  /(D(I)*DZ(K))   ! SUM(APQY1N * N_photons(I,K,:,1))            ! loss to NCDOC
+			  DTWCDON1(I,K) = DTWCDON1(I,K) + DPD31N(I,K)  /MyLayerThickness &  !SUM(APQY31 * N_photons(I,K,:,3)) &!
+										    + DPD21N(I,K)  /MyLayerThickness &  !SUM(APQY21 * N_photons(I,K,:,2))	       &		!
+										    - DPD10N(I,K) /MyLayerThickness &  !SUM(APQY10 * N_photons(I,K,:,1))         &!
+										    - DPD1NN(I,K)  /MyLayerThickness   ! SUM(APQY1N * N_photons(I,K,:,1))            ! loss to NCDOC
 											
 			! all losses to the non-colored pools get fractionated after their transformations
 											
 ! THE IMPACT of PD on transformations from colored ---> non-colored, FOR DON WILL USE THE SAME FRACTIONS AS DOC
 
 	!NCDOn1											
-			DTWNCDON1(I,K) = DTWNCDON1(I,K) + DPD3NN(I,K) * FPDC31/(D(I)*DZ(K)) &  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC31     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored biolabile)
-											+ DPD2NN(I,K) * FPDC21/(D(I)*DZ(K)) &  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC21	& ! same as above but 2 to 1 
-											+ DPD1NN(I,K) * FPDC11/(D(I)*DZ(K))    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC11   ! from LMW colored to bio-labile
+			DTWNCDON1(I,K) = DTWNCDON1(I,K) + DPD3NN(I,K) * FPDC31/MyLayerThickness &  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC31     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored biolabile)
+											+ DPD2NN(I,K) * FPDC21/MyLayerThickness &  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC21	& ! same as above but 2 to 1 
+											+ DPD1NN(I,K) * FPDC11/MyLayerThickness    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC11   ! from LMW colored to bio-labile
 	!NCDON2										
-			DTWNCDON2(I,K) = DTWNCDON2(I,K) + DPD3NN(I,K) * FPDC32/(D(I)*DZ(K))  &  ! SUM(APQY3N * N_photons(I,K,:,3)) * FPDC32     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored semi-labile)
-											+ DPD2NN(I,K) * FPDC22/(D(I)*DZ(K)) &  !    SUM(APQY2N * N_photons(I,K,:,2))* FPDC22	& ! same as above but 2 to 1 
-											+ DPD1NN(I,K) * FPDC12/(D(I)*DZ(K))    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC12   ! from LMW colored to bio-labile											
+			DTWNCDON2(I,K) = DTWNCDON2(I,K) + DPD3NN(I,K) * FPDC32/MyLayerThickness  &  ! SUM(APQY3N * N_photons(I,K,:,3)) * FPDC32     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored semi-labile)
+											+ DPD2NN(I,K) * FPDC22/MyLayerThickness &  !    SUM(APQY2N * N_photons(I,K,:,2))* FPDC22	& ! same as above but 2 to 1 
+											+ DPD1NN(I,K) * FPDC12/MyLayerThickness    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC12   ! from LMW colored to bio-labile											
 	
 	!NCDON3
-			DTWNCDON3(I,K) = DTWNCDON3(I,K) + DPD3NN(I,K) * FPDC33/(D(I)*DZ(K)) &  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC33     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored refractory)
-											+ DPD2NN(I,K) * FPDC23/(D(I)*DZ(K))&  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC23	& ! same as above but 2 to 1 
-											+ DPD1NN(I,K) * FPDC13/(D(I)*DZ(K))    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC13   ! from LMW colored to bio-labile											
+			DTWNCDON3(I,K) = DTWNCDON3(I,K) + DPD3NN(I,K) * FPDC33/MyLayerThickness &  !SUM(APQY3N * N_photons(I,K,:,3)) * FPDC33     &   ! non colored PD transformation from 3 to 1 (HMW colored to non-colored refractory)
+											+ DPD2NN(I,K) * FPDC23/MyLayerThickness&  !SUM(APQY2N * N_photons(I,K,:,2))* FPDC23	& ! same as above but 2 to 1 
+											+ DPD1NN(I,K) * FPDC13/MyLayerThickness    !SUM(APQY1N * N_photons(I,K,:,1)) * FPDC13   ! from LMW colored to bio-labile											
 	
 		!	END DO							
 		END DO

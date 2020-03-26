@@ -219,9 +219,14 @@ MODULE mod_ncdio
 						
 	
 	USE WC_DOM, ONLY: WC_CDOC1, WC_CDOC2, WC_CDOC3, &
-				   	WC_NCDOC1, WC_NCDOC2, WC_NCDOC3, &
+             WC_NCDOC1, WC_NCDOC2, WC_NCDOC3, &
+
+            XFLUX_CDOC1, XFLUX_CDOC2, XFLUX_CDOC3, &
+            XFLUX_NCDOC1, XFLUX_NCDOC2, XFLUX_NCDOC3, &
+
 					WC_CDON1, WC_CDON2, WC_CDON3, &
-				   	WC_NCDON1, WC_NCDON2, WC_NCDON3, & 
+             WC_NCDON1, WC_NCDON2, WC_NCDON3, & 
+             
 					WC_CDOP1, WC_CDOP2, WC_CDOP3, &
 				   	WC_NCDOP1, WC_NCDOP2, WC_NCDOP3, &
 						COAGN, & 
@@ -267,6 +272,8 @@ MODULE mod_ncdio
    integer :: nout_vars          !!number of variables to output
    integer :: cdf_int            !!output every cdf_int seconds (used to be intervals)
    integer :: cdf_stk            !!cdf_stk outputs are put in each file
+   integer :: cdf_start  !! starting day to output netcdf
+   integer :: cdf_end    !! ending day to output netcdf
    !!CDF_STK=0: ALL OUTPUTS IN SINGLE FILE
    integer :: stck_cnt           !!counts number of outputs in each file
    integer :: out_cnt            !!counts number of outputs
@@ -391,14 +398,28 @@ MODULE mod_ncdio
 		integer,private :: WC_NCDOC3_vid
 		integer,private :: WC_CDOC1_vid
 		integer,private :: WC_CDOC2_vid
-		integer,private :: WC_CDOC3_vid
+    integer,private :: WC_CDOC3_vid
+    
+    integer,private :: XFLUX_NCDOC1_vid
+		integer,private :: XFLUX_NCDOC2_vid
+		integer,private :: XFLUX_NCDOC3_vid
+		integer,private :: XFLUX_CDOC1_vid
+		integer,private :: XFLUX_CDOC2_vid
+		integer,private :: XFLUX_CDOC3_vid
 									
 		integer,private :: WC_NCDON1_vid
 		integer,private :: WC_NCDON2_vid
 		integer,private :: WC_NCDON3_vid
 		integer,private :: WC_CDON1_vid
 		integer,private :: WC_CDON2_vid
-		integer,private :: WC_CDON3_vid   	
+    integer,private :: WC_CDON3_vid   
+    
+    integer,private :: XFLUX_NCDON1_vid
+		integer,private :: XFLUX_NCDON2_vid
+		integer,private :: XFLUX_NCDON3_vid
+		integer,private :: XFLUX_CDON1_vid
+		integer,private :: XFLUX_CDON2_vid
+		integer,private :: XFLUX_CDON3_vid   
 
 		integer,private :: WC_NCDOP1_vid
 		integer,private :: WC_NCDOP2_vid
@@ -629,7 +650,28 @@ MODULE mod_ncdio
      call pstop
    end if
    
+!------------------------------------------------------------------------------|
+!  cdf_start cdf_end                             
+!------------------------------------------------------------------------------|
 
+   ISCAN = SCAN_FILE(TRIM(FNAME),"CDF_START",ISCAL = CDF_START)
+   if(iscan /= 0)then
+     write(ipt,*)'error reading cdf_start: ',iscan
+     if(iscan == -2)then
+       write(ipt,*)'variable not found in input file: ',trim(fname)
+     end if
+     call pstop
+   end if
+   
+   ISCAN = SCAN_FILE(TRIM(FNAME),"CDF_END",ISCAL = CDF_END)
+   if(iscan /= 0)then
+     write(ipt,*)'error reading cdf_end: ',iscan
+     if(iscan == -2)then
+       write(ipt,*)'variable not found in input file: ',trim(fname)
+     end if
+     call pstop
+   end if
+      
 !------------------------------------------------------------------------------|
 !     cdf_vdp: list of variables to write to output file
 !------------------------------------------------------------------------------|
@@ -648,6 +690,9 @@ MODULE mod_ncdio
 
    cdf_vdp(1:nout_vars)= charvec(1:nout_vars)
 
+   
+   
+   
 !------------------------------------------------------------------------------|
 !            SCREEN REPORT OF SET VARIABLES                                    !
 !------------------------------------------------------------------------------|
@@ -658,6 +703,8 @@ MODULE mod_ncdio
        write(ipt,*)'!  netcdf i/o            :  active'
        write(ipt,*)'!  output every # its    : ',cdf_int
        write(ipt,*)'!  # dumps / file        : ',cdf_stk
+	   write(ipt,*)'!  # Starting Day        : ',cdf_start
+	   write(ipt,*)'!  # Ending Day          : ',cdf_end
        write(ipt,*)'!  # variables to write  : ',nout_vars
        do i=1,nout_vars
          write(ipt,999)i,trim(cdf_vdp(i))
@@ -1031,6 +1078,55 @@ MODULE mod_ncdio
     ierr = nf90_put_att(nc_ofid,WC_NCDOC3_vid,"units","mgC/L")
     ierr = nf90_put_att(nc_ofid,WC_NCDOC3_vid,"grid","fvcom_grid")
     ierr = nf90_put_att(nc_ofid,WC_NCDOC3_vid,"type","data")
+
+  case("XFLUX_CDOC1") !!===============XFLUX_CDOC1====================================!
+    ierr = nf90_def_var(nc_ofid,"XFLUX_CDOC1",nf90_float,dynm3dn_lay,XFLUX_CDOC1_vid)
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC1_vid,"long_name","Colored DOC1 Volume Flux")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC1_vid,"standard_name","XFLUX_CDOC1")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC1_vid,"units","gC/s")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC1_vid,"grid","fvcom_grid")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC1_vid,"type","data")
+
+	case("XFLUX_CDOC2") !!===============XFLUX_CDOC2====================================!
+    ierr = nf90_def_var(nc_ofid,"XFLUX_CDOC2",nf90_float,dynm3dn_lay,XFLUX_CDOC2_vid)
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC2_vid,"long_name","Colored DOC2 Volume Flux")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC2_vid,"standard_name","XFLUX_CDOC2")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC2_vid,"units","gC/s")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC2_vid,"grid","fvcom_grid")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC2_vid,"type","data")
+
+	case("XFLUX_CDOC3") !!===============XFLUX_CDOC3====================================!
+    ierr = nf90_def_var(nc_ofid,"XFLUX_CDOC3",nf90_float,dynm3dn_lay,XFLUX_CDOC3_vid)
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC3_vid,"long_name","Colored DOC3 Volume Flux")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC3_vid,"standard_name","XFLUX_CDOC3")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC3_vid,"units","gC/s")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC3_vid,"grid","fvcom_grid")
+    ierr = nf90_put_att(nc_ofid,XFLUX_CDOC3_vid,"type","data")
+	
+  case("XFLUX_NCDOC1") !!===============XFLUX_NCDOC1====================================!
+    ierr = nf90_def_var(nc_ofid,"XFLUX_NCDOC1",nf90_float,dynm3dn_lay,XFLUX_NCDOC1_vid)
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC1_vid,"long_name","Non-Colored DOC1 Volume Flux")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC1_vid,"standard_name","XFLUX_NCDOC1")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC1_vid,"units","gC/s")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC1_vid,"grid","fvcom_grid")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC1_vid,"type","data")
+
+  case("XFLUX_NCDOC2") !!===============XFLUX_NCDOC2====================================!
+    ierr = nf90_def_var(nc_ofid,"XFLUX_NCDOC2",nf90_float,dynm3dn_lay,XFLUX_NCDOC2_vid)
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC2_vid,"long_name","Non-Colored DOC2 Volume Flux")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC2_vid,"standard_name","XFLUX_NCDOC2")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC2_vid,"units","gC/s")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC2_vid,"grid","fvcom_grid")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC2_vid,"type","data")
+
+
+  case("XFLUX_NCDOC3") !!===============XFLUX_NCDOC3====================================!
+    ierr = nf90_def_var(nc_ofid,"XFLUX_NCDOC3",nf90_float,dynm3dn_lay,XFLUX_NCDOC3_vid)
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC3_vid,"long_name","Non-Colored DOC3 Volume Flux")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC3_vid,"standard_name","XFLUX_NCDOC3")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC3_vid,"units","gC/s")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC3_vid,"grid","fvcom_grid")
+    ierr = nf90_put_att(nc_ofid,XFLUX_NCDOC3_vid,"type","data")
 	
 	!DON
 	case("WC_CDON1") !!===============WC_CDON1====================================!
@@ -1134,7 +1230,7 @@ MODULE mod_ncdio
 	 case("JCIN") !!===============jcin======================================!
      ierr = nf90_def_var(nc_ofid,"JCIN",nf90_float,dynm2dn,jcin_vid)
      ierr = nf90_put_att(nc_ofid,jcin_vid,"long_name","flux of particulate organic carbon form POC")
-     ierr = nf90_put_att(nc_ofid,jcin_vid,"units","gO2/m^2/d")
+     ierr = nf90_put_att(nc_ofid,jcin_vid,"units","gC/m^2/d")
      ierr = nf90_put_att(nc_ofid,jcin_vid,"positive","down")
      ierr = nf90_put_att(nc_ofid,jcin_vid,"standard_name","POC flux")
      ierr = nf90_put_att(nc_ofid,jcin_vid,"type","data")
@@ -2505,7 +2601,7 @@ MODULE mod_ncdio
        i1 = lbound(salt,1) ; i2 = ubound(salt,1)
        call putvar(i1,i2,m,mgl,kb,kb-1,"n",salt,nc_ofid,s1_vid,myid&
             &,nprocs,ipt, stck_cnt) 
-	   	   	   
+	 !DOC  	   	   
 	   case("WC_CDOC1") !!===============WC_CDOC1===============================!
        i1 = lbound(WC_CDOC1,1) ; i2 = ubound(WC_CDOC1,1)
        call putvar(i1,i2,m,mgl,kb,kb-1,"n",WC_CDOC1,nc_ofid,WC_CDOC1_vid,myid&
@@ -2534,8 +2630,7 @@ MODULE mod_ncdio
 	   case("WC_NCDOC3") !!===============WC_NCDOC3===============================!
        i1 = lbound(WC_NCDOC3,1) ; i2 = ubound(WC_NCDOC3,1)
        call putvar(i1,i2,m,mgl,kb,kb-1,"n",WC_NCDOC3,nc_ofid,WC_NCDOC3_vid,myid&
-            &,nprocs,ipt, stck_cnt) 
-	   
+            &,nprocs,ipt, stck_cnt)     
 	   !DON
 	   case("WC_CDON1") !!===============WC_CDON1===============================!
        i1 = lbound(WC_CDON1,1) ; i2 = ubound(WC_CDON1,1)

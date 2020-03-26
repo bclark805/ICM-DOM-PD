@@ -1283,7 +1283,9 @@ USE MOD_HYDROVARS, ONLY:   &
                                            JCH4GTM1S,& !CH4 gas flux to water column (gO2/m^2/d)
                                            JHSTM1S,     & !dissolved HS flux to water column (gO2/m^2/d)
                                            JSITM1S       !dissolved Si flux to water column (gO2/m^2/d)
-                                           
+										   
+    REAL(SP),ALLOCATABLE,DIMENSION(:) :: JNH4_OUt, JNO3_OUT ! Integrated variables for calculating budgets ,
+															!are integrated in time and space in wqm_main
     !WLong moved here from wqm_modules.F
     !sediment burial fluxes of C, N, P
      REAL(SP),ALLOCATABLE,DIMENSION(:) ::     BURIALC,    & !Burial flux of carbon    (mgC/m^2/day)
@@ -1575,6 +1577,8 @@ USE MOD_HYDROVARS, ONLY:   &
                            JPON(:,:), &!PON flux (mgN/m^2/day) positive into sediments
                            JPOC(:,:), &!POC flux (mgC/m^2/day) positive into sediments
                            JPOS(:)       !POSi settlong flux(mgSi/m^2/day) positive into sediments
+						   
+	REAL(SP),ALLOCATABLE, DIMENSION(:,:):: JPOC_out,JPON_out, JPOP_out ! Added by B Clark for Budget Calculation
                            
     REAL(SP),ALLOCATABLE:: JPOPaccum(:,:), &!accumulative POP flux (mgP/m^2/day) positive into sediments
                            JPONaccum(:,:), &!accumulative PON flux (mgN/m^2/day) positive into sediments
@@ -1736,7 +1740,9 @@ USE MOD_HYDROVARS, ONLY:   &
      ALLOCATE(JCH4GTM1S(MTLOC));          JCH4GTM1S=0.0
      ALLOCATE(JHSTM1S(MTLOC));            JHSTM1S=0.0
      
-    
+     ALLOCATE(JNH4_out(MTLOC));           JNH4_out=0.0
+     ALLOCATE(JNO3_out(MTLOC));           JNO3_out=0.0
+	 
      !WLong moved here from wqm_modules.F
      ALLOCATE(NH41TM1S(MTLOC));           NH41TM1S  = 0.0
      ALLOCATE(NH42TM1S(MTLOC));           NH42TM1S  = 0.0
@@ -1949,7 +1955,11 @@ USE MOD_HYDROVARS, ONLY:   &
         ALLOCATE(JPOC(MTLOC,3));           JPOC = 0.0
         ALLOCATE(JPOP(MTLOC,3));           JPOP = 0.0 
         ALLOCATE(JPON(MTLOC,3));           JPON = 0.0
-        ALLOCATE(JPOS(MTLOC));             JPOS = 0.0     
+        ALLOCATE(JPOS(MTLOC));             JPOS = 0.0 
+		
+		ALLOCATE(JPOC_out(MTLOC,3)); JPOC_out=0.		
+		ALLOCATE(JPOP_out(MTLOC,3)); JPOP_out=0.
+		ALLOCATE(JPON_out(MTLOC,3)); JPON_out=0.
         
         ALLOCATE(JPOCaccum(MTLOC,3));           JPOCaccum = 0.0
         ALLOCATE(JPOPaccum(MTLOC,3));           JPOPaccum = 0.0 
@@ -2015,6 +2025,9 @@ END SUBROUTINE SED_ALLOC
      IF(ALLOCATED(JCH4TM1S)) DEALLOCATE (JCH4TM1S)
      IF(ALLOCATED(JCH4GTM1S)) DEALLOCATE (JCH4GTM1S)
      IF(ALLOCATED(JHSTM1S)) DEALLOCATE (JHSTM1S)
+	 
+	 IF(ALLOCATED(JNH4_out)) DEALLOCATE (JNH4_out)
+     IF(ALLOCATED(JNO3_out)) DEALLOCATE (JNO3_out)
      
      !WLong moved these from wqm_main.F
      IF(ALLOCATED(NH41TM1S)) DEALLOCATE (NH41TM1S)
@@ -2077,6 +2090,13 @@ END SUBROUTINE SED_ALLOC
      IF(ALLOCATED(JPOC_GL))        DEALLOCATE(JPOC_GL)
      IF(ALLOCATED(JPON_GL))        DEALLOCATE(JPON_GL)
      IF(ALLOCATED(JPOP_GL))        DEALLOCATE(JPOP_GL)
+
+! Added by B Clark for budget calculation
+	 IF(ALLOCATED(JPOC_out))        DEALLOCATE(JPOC_out)
+     IF(ALLOCATED(JPON_out))        DEALLOCATE(JPON_out)
+     IF(ALLOCATED(JPOP_out))        DEALLOCATE(JPOP_out)
+	 
+	 
      IF(ALLOCATED(JPOS_GL))        DEALLOCATE(JPOS_GL)
      !IF(ALLOCATED(O20_GL))        DEALLOCATE(O20_GL)        !given by C2_GL(:,:,27)
      !IF(ALLOCATED(D_GL))        DEALLOCATE(D_GL)        !already defined
@@ -5392,7 +5412,11 @@ ENDIF
      
 !	 write(*,*)' S before DOM = ',S  ! B CLARK S_SHARE GETS PASSED TO THE MOD_SED_DOM 
 #if defined(SEDIMENT_DOM)	 
-	! S_SHARE(I) = S/HSED1(I)
+   ! S_SHARE(I) = S/HSED1(I)
+
+   !   IF(D(I)*DZ(KBM1)<=0.055)THEN
+   !    S=1.e-10;
+   !   ENDIF
 	 S_SHARE(I) = S/((HSED1(I)+D(I)*DZ(KBM1))*0.5)   
 	 
 	 HSED1_SHARE(I)=HSED1(I)

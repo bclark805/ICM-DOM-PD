@@ -75,7 +75,7 @@
 		!,DZZ	&		!DELTA OF INTRA LEVEL SIGMA 
 		!,H1	&		!BATHYMETRIC DEPTH 
 		!,H	&			!BATHYMETRIC DEPTH 
-		!,D	&			!CURRENT DEPTH 
+		  ,D	&			!CURRENT DEPTH 
 		!,DT	&		!DEPTH AT PREVIOUS TIME STEP
 		!,DT1	&		!DEPTH AT PREVIOUS TIME STEP
 		!,EL	&		!CURRENT SURFACE ELEVATION
@@ -191,12 +191,14 @@
 
    USE MOD_WQM, ONLY : C2,C2F,NAC,AC
    USE MOD_PREC, ONLY: SP	
+   USE MOD_PAR, ONLY : NGID
 
    USE MOD_BCMAP, ONLY: IOBCN, I_OBC_N
    
    IMPLICIT NONE
    REAL(SP):: NUTMAX,NUTMIN
    INTEGER :: I,J,K,JCON,II
+
 !==============================================================================|
   DO JCON=1,NAC
    II=AC(JCON)
@@ -221,7 +223,8 @@
        ENDDO
       ENDIF
 
-      DO K=1,KBM1
+	  DO K=1,KBM1
+
        NUTMAX = MAXVAL(C2(NBSN(I,1:NTSN(I)),K,II))
        NUTMIN = MINVAL(C2(NBSN(I,1:NTSN(I)),K,II))
 
@@ -239,15 +242,45 @@
        ENDIF
 
 !tykim commented out two lines below
-       IF(NUTMIN-C2F(I,K,II) >  0.0_SP ) C2F(I,K,II) = NUTMIN
-       IF(C2F(I,K,II)-NUTMAX >  0.0_SP ) C2F(I,K,II) = NUTMAX
+	    IF(NUTMIN-C2F(I,K,II) >  0.0_SP ) THEN
+	!   IF(NUTMIN-C2F(I,K,II) >  C2F(I,K,II)*0.01) THEN
+	!	IF(II==35 .or. II==27)THEN
+		! write(*,*)'Corrected variable that was too low ',II
+!		write(*,*)'For ii node, depth, before, after',ii,NGID(I),K,C2F(I,K,II),NUTMIN
+		! write(*,*)'And depth',K
+		! write(*,*)'Value before = ',C2F(I,K,II)
+!	     endif
+		 C2F(I,K,II) = NUTMIN
+		!  if(ii==35)THEN
+		!  write(*,*)'Value After = ',C2F(I,K,II)
+		!  endif
+
+		
+       ENDIF
+	    IF(C2F(I,K,II)-NUTMAX >  0.0_SP ) THEN
+!	   IF(C2F(I,K,II)-NUTMAX >  C2F(I,K,II)*0.01)  THEN
+!		 if(II==35 .or. II==27)THEN
+!			write(*,*)'for II node, depth, before, after',II,NGID(I),K,C2F(I,K,II),NUTMAX
+	
+		! write(*,*)'Corrected variable that was too high' ,II
+		! write(*,*)'At node ',NGID(I)
+		! write(*,*)'And depth',K
+		! write(*,*)'Value before = ',C2F(I,K,II)
+!	     endif
+!
+		C2F(I,K,II) = NUTMAX
+		! if(ii==35)THEN
+		! write(*,*)'Value After = ',C2F(I,K,II)
+		! endif
+		
+	   ENDIF
 
 !       IF(NUTMIN-C2F(I,K,II) >  C2F(I,K,II)*0.001 ) C2F(I,K,II) = NUTMIN
 !       IF(C2F(I,K,II)-NUTMAX >  C2F(I,K,II)*0.001 ) C2F(I,K,II) = NUTMAX
       ENDDO
 
  200 CONTINUE
-
+	
    ENDDO
    ENDDO
    RETURN

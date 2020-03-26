@@ -2171,9 +2171,9 @@ USE MOD_SED_DOM, ONLY: 	SED_DOM_ALLOCATE_VARS,   &
        AC(NAC) = JCON
      ENDIF
    ENDDO
-   write(*,*) ' NAC = ', NAC
-   write(*,*)'Active consituents are'
-   write(*,*),AC
+  !  write(*,*) ' NAC = ', NAC
+  !  write(*,*)'Active consituents are'
+  !  write(*,*),AC
 
      VOLUME_BALANCE   = VBC == ' ON'
      FLOW             = FLC == ' ON'
@@ -4200,7 +4200,7 @@ write(*,*)'  Inside the par loop'
 	 
 ! B Clark added for netcdf output Sep 2018
 	 write(*,*)'About to call set NCDIO'
-	     CALL SET_NCD_IO
+       CALL SET_NCD_IO
 	 write(*,*)'Called set NCDIO'
 
 !--------------------------------------------------------------------	 

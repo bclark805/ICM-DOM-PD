@@ -98,6 +98,9 @@ MODULE MOD_WQM
                                     RPOC, & !12 refractory particulate organic carbon concentration (gC/m^3)
                                     NH4,  & !13 ammonia concentration in water column (gN/m^3)
                                     NO3,  & !14 nitrate concentration in water column (gN/m^3)
+									
+									DTNH4_out, DTNO3_out, &!Integrated change in Nh4 and NO3 g N
+									
                                     UREA, & !15 urea concentration (gN/m^3)    !Wen Long: this term is never used !!!
                                !     LDON, & !16 labile dissolved organic nitrogen concentration (gN/m^3)  ! ! Moved to mod_wc_doc B Clark Sep 2015
                                 !    RDON, & !17 labile dissolved organic nitrogen concentration (gN/m^3)  ! Moved to mod_wc_doc B Clark Sep 2015
@@ -116,6 +119,10 @@ MODULE MOD_WQM
                                     PIB1, & !Phosphorus in algae 1 (gP/m^3)
                                     PIB2, & !Phosphorus in algae 2 (gP/m^3)
                                     PIB3    !Phosphorus in algae 3 (gP/m^3)
+									
+									
+			REAL(SP),ALLOCATABLE,DIMENSION(:,:) :: DTLPOC_out,DTRPOC_out, &
+												   DTLPON_out,DTRPON_out   !  B Clark added for Budget Calculation, Feb 2019
 
             !Water column settling rates
             !3D Spatially varying (horizontally and vertically) settling velocities (read from STLFN)
@@ -1597,623 +1604,8 @@ MODULE MOD_WQM
 
 ! B Clark for sediment Resuspension, June 2018
 	REAL(SP), ALLOCATABLE :: ShearStress(:), RHO1(:,:), RHO1_GL(:,:),ShearStress_GL(:) ! Added by B Clark to calculate shear stress for sediment resuspension, June 2018, Pascals and kg m^3
-								  
-        !********************************************************************************
-        !**                           Sediment Model Setup                             **
-        !********************************************************************************
 
-        !***** Variable declarations
-
-        !WLong moved to wqm_sed.F
-            !REAL(SP) :: KSI,       &  !reaction rate for particulate biogenic Si (1/day)
-            !        THTASI        !temperature control theta for KSI
-
-
-            ! REAL(SP) :: M1,       & !layer 1 solids concentration  (kg/L)
-            !         M2,       & !layer 2 solids concentration  (kg/L)
-            !         THTADP,   & !temperature theta for particle diffusion coefficient
-            !                     !(Dp)
-            !         THTADD,     !temperature tehat for porewater diffusion coefficient
-            !                     !(Dd)
-
-            !Ammonia nitrification kinetics 
-            ! REAL(SP) :: KAPPNH4F, & !Nitrification reaction velocity (m/day)
-            !                     !for freshwater in layer 1
-            !         KAPPNH4S, & !Nitrification reaction velocity (m/day) for salt water
-            !                     !in layer 1
-            !         PIENH4,   & !Ammonia partition coefficient (L/kg)
-            !         THTANH4,  & !temperature control theta for Theta for nitrification
-            !                     !reaction velicities 
-            !         KMNH4,    & !Nitrification half saturation constant for ammonia 
-            !                     ! mg N/m^3
-            !         KMNH4O2     !Nitrification half saturation constant for oxygen
-            !                     ! mgO2/L
-
-            !NO3 denitrification kinetics
-            !REAL(SP) :: KAPPNO3F,  &  !Denitrification reaction velocity (m/day) for fresh
-            !                      !water in layer 1
-            !        KAPPNO3S,  &  !Denitrification reaction velocity (m/day) for salt
-            !                      !water in layer 1
-            !        K2NO3,     &  !Denitrification reaction velocity in layer 2 (m/day)
-            !        THTANO3       !temperature control theta for denitrification
-
-            !HS sulfide oxidation kinetics
-            !REAL(SP) :: KAPP1HSD,     &  !Reaction velocity for dissolved sulfide oxidation in layer 1 (m/day)
-            !        KAPP1HSP,     &  !Reaction velocity for particulate sulfide oxidation in layer 1 (m/day)
-            !        PIE1HS,      &  !Partition coefficient for sulfide in layer 1 (L/kg)
-            !        PIE2HS,      &  !Partition coefficient for sulfide in layer 2 (L/kg)
-            !        THTAH2S,    &  !temperature control theta for both dissolved and
-            !                       !particulate sulfide
-            !        KMHSO2         !Sulfide oxidation normalization constant
-            !                       !for oxygen (mg O2/L)
-
-            !Silica kinetics
-            !REAL(SP) ::  CSISAT,  & !Saturation concentration for pore water silica
-            !                    ! (mgSi/m^3)
-            !         DPIE1SI, & !Incremental partition coefficient for silica in layer 1 (unitless)
-            !         PIE2SI,  & !Partition coefficient for silica in layer 2 (L/kg)
-            !         KMPSI      !Particulate biogenic silica half saturation for silica 
-            !                    !for dissolution (mgSi/m^3)
-
-            !REAL(SP) ::   O2CRITSI,  & !Critical dissolved oxygen concentration for layer 1
-            !                       ! incremental silica sorption  mg O2/L
-            !           JSIDETR     !Detrital biogenic silica source to
-            !                       ! sediment mg Si/m2-d
-
-            !PO4 sorption kinetics
-            !REAL(SP) :: DPIE1PO4F, &    !Incremental partition coefficient for
-            !                        !phosphate in layer 1 (freshwater)        L/kg 
-            !        DPIE1PO4S, &    !Incremental partition coefficient for
-            !                        !phosphate in layer 1 (saltwater)         L/kg
-            !        PIE2PO4,   &    !Partition coefficient for phosphate
-            !                        !in layer 2                               L/kg
-            !        O2CRITPO4,    &    !Critical dissolved oxygen concentration for
-            !                        !layer 1 incremental phosphate sorption   mg O2/L
-            !        KMO2DP          !Particle mixing half saturation constant
-            !                        !for oxygen mgO2/L (bioturbation)
-
-            !benthic stress and bioturbation etc mixing control
-            !REAL(SP) :: TEMPBEN, &      !temperature at which benthic stress is reset to
-            !                        !zero (degC)
-            !       KBENSTR, &       !Decay constant for benthic stress (1/day)
-            !       KLBNTH,  &       !Ratio of bio-irrigation to bioturbation
-            !       DPMIN            !Minimum particle diffusion coefficient (m2/day)
-
-
-            !methane kinetics
-            !REAL(SP) :: KAPPCH4, &      !methane oxidation reaction velocity      m/day
-            !        THTACH4, &      !temperature control theta for methane oxidation
-            !        KMCH4O2, &      !methane oxidation saturation concentration for
-            !                        !oxygen (mgO2/L)
-            !        KMSO4           !saturation concentration for SO4 in layer 2 for
-            !                        !methane oxidation by sulfate (?)
-
-
-            !Deposit feeder 
-
-            !REAL(SP) :: XKMI0,    &
-            !        ING0,     &
-            !        THTAI0,   &
-            !        R,        &
-            !        THTAR,    &
-            !        BETA,     &
-            !        THBETA,   &
-            !        AMCN,     &
-            !        AMCP,     &
-            !        AA1,      &
-            !        AA2,      &
-            !        XKMG1,    &
-            !        XKMG2,    &
-            !        TDD      
-
-
-            !benthic algae kinetics
-            !REAL(SP) :: PMB,      &
-            !        ANCB,     &
-            !        APCB,     &
-            !        KTGB1,    &
-            !        KTGB2,    &
-            !        TMB,      &
-            !        KESED,    &
-            !        KEBALG,   &
-            !        KHNB,     &
-            !        KHPB,     &
-            !        KHRB,     &
-            !        BMRB,     &
-            !        BPRB,     &
-            !        KTBB,     &
-            !        TRB,      &
-            !        BALGMIN,  &
-            !        FNIB,     &
-            !        FPIB
-
-            !WLong moved to wqm_sed.F
-            ! REAL(SP) :: K0H1D,   &
-            !         K0H1P,   &
-            !         K1H1D,   &
-            !         K1H1P,   &
-            !         K2H2D,   &
-            !         K2H2P,   &
-            !         K3,      &
-            !         J1,      &
-            !         J2,      &
-            !         KMC1,    &
-            !         KL12,    &
-            !         KL12NOM, &
-            !         KHS_1,   &
-            !         KL12SO4
-
-            !WLong moved to wqm_sed.F
-        !     REAL(SP) :: NH40,     &
-        !             NH41,     &
-        !             NH42,     &
-        !             NH4T1,    &
-        !             NH4T2,    &
-        !             NH41TM1,  &
-        !             NH4T2TM1, &
-        !             JNH4
-        !
-        !     REAL(SP) :: NO30,     &
-        !             NO31,     &
-        !             NO32,     &
-        !             NO3T1,    &
-        !             NO3T2,    &
-        !             NO31TM1,  &
-        !             NO3T2TM1, &
-        !             JNO3
-        !
-        !   REAL(SP) ::   JSI,      &
-        !             JPO4      
-        ! 
-        !    REAL(SP) ::  JCH4AQ,   &
-        !             JO2NH4,   &
-        !             JCH4G,    &
-        !             CH40,     &
-        !             CH41,     &
-        !             CH42,     &
-        !             CH42AV,   &
-        !             CH4T1,    &
-        !             CH4T2,    &
-        !             CH4T2AV,  &
-        !             CH41TM1,  &
-        !             CH4T2TM1, &
-        !             JCH4,     &
-        !             CH4T2SAV, & !never used
-        !             JCH4GASO2,& !never used
-        !             JGAS        !never used
-        !
-        !    REAL(SP) ::  SO40,     &
-        !             SO41,     &
-        !             SO42,     &
-        !             SO42AV,   &
-        !             SO4T1,    &
-        !             SO4T2,    &
-        !             SO4T2AV,  &
-        !             SO40MG,   &
-        !             SO41TM1,  &
-        !             SO4T2TM1, &
-        !             JSO4,     &
-        !             SO4T2SAV    !never used
-        !
-        !     REAL(SP) :: HS0,      &
-        !             JHS
-
-        !     REAL(SP) :: KPOP1,    &
-        !             KPOP2,    &
-        !             KPOP3,    &
-        !             KPON1,    &
-        !             KPON2,    &
-        !             KPON3,    &
-        !             KPOC1,    &
-        !             KPOC2,    &
-        !             KPOC3
-
-        !     REAL(SP) :: ISEDMN,   &
-        !             ISEDMP,   &
-        !             ISEDMC
-
-        !     REAL(SP) :: NH4AVL,   &
-        !             NO3AVL,   &
-        !             KETOTL    !never used
-
-             !WLong moved this to wqm_sed.F
-
-             !LOGICAL :: BENTHIC_OUTPUT,      & !flag for benthic model output
-             !           STEADY_STATE_SED_G3,    & !flag for G3 steady state simulation for
-             !                                  !sediment module
-             !           BALGAE_CALC            !flag for activating benthic algae
-             !                                  !calculation
-
-        !***** Dimension declarations
-            
-             !WLong moved the following to wqm_sed.F
-             !!sediment reaction kinetics 
-             !REAL(SP),DIMENSION(3) :: KPDIAG, &  !G1,G2,G3 diagenesis rate for P (1/day)
-             !                     DPTHTA, &  !Temperature control theta for P
-             !                     KNDIAG, &  !G1,G2,G3 diagenesis rate for N (1/day)
-             !                     DNTHTA, &  !Temperature control theta for N
-             !                     KCDIAG, &  !G1,G2,G3 diagenesis rate for C (1/day)
-             !                     DCTHTA    !Temperature control theta for C
-
-             !WLong moved the following to wqm_sed.F
-             !!sediment POM and silica
-             !REAL(SP),ALLOCATABLE,DIMENSION(:) :: PON1TM1S,        &  !sediment G1 PON
-             !                                 PON2TM1S,        &  !sediment G2 PON
-             !                                 PON3TM1S,        &  !sediment G3 PON
-             !                                 POC1TM1S,        &  !sediment G1 POC
-             !                                 POC2TM1S,        &  !sediment G2 POC
-             !                                 POC3TM1S,        &  !sediment G3 POC
-             !                                 POP1TM1S,        &  !sediment G1 POP
-             !                                 POP2TM1S,        &  !sediment G2 POP
-             !                                 POP3TM1S,        &  !sediment G3 POP
-             !                                 PSISEDTM1S             !sediment particulate
-             !                                                     !organic silica
-
-             !WLong moved these to wqm_sed.F
-             !benthic stress calculation
-             !REAL(SP),ALLOCATABLE,DIMENSION(:)::  BENSTRTM1S,        &  !sediment sediment
-             !                                                     !benthic stres
-             !                                 BFORMAXS,        &  !used for calculating
-             !                                                     !benthic stress accumulation
-             !                                 ISWBENS             !Array indicating
-             !                                                     !whether  benthic stress accumulation is
-             !                                                     !set to zero
-             !                                                     !
-             !                                                     ! If sediment temperature > TEMPBEN, then
-             !                                                     ! yes, it is set to zero
-             !                                                     !  and ISWBENS=1, BFORMAX=0
-             !                                                     !  other wise ISWBENS is 0,
-             !                                                     !  BFOR=BFORMAX
-
-             !WLong moved to wqm_sed.F
-             !sediment inorganic chemicals 
-             !REAL(SP),ALLOCATABLE,DIMENSION(:) :: NH41TM1S,  &  !sediment NH4 (1st layer)
-             !                                 NH4T2TM1S, &  !sediment NH4 (2nd layer
-             !                                 NO31TM1S,  &  !sediment NO3 (1st layer)
-             !                                 NO3T2TM1S, &  !sediment NO3 (2nd layer)
-             !                                 HS1TM1S,   &  !sediment HS (1st layer)
-             !                                 HST2TM1S,  &  !sediment HS (2nd layer)
-             !                                 SI1TM1S,   &  !sediment silica (1st layer)
-             !                                 SIT2TM1S,  &  !sediment silica (2nd layer)
-             !                                 PO41TM1S,  &  !sediment PO4 (1st layer)
-             !                                 PO4T2TM1S  &  !sediment PO4 (2nd layer)
-             !                                 CH4T2TM1S, &  !sediment CH4 (1st layer)
-             !                                 CH41TM1S,  &  !sediment CH4 (2nd layer)
-             !                                 SO4T2TM1S     !sediment SO4 (2nd layer)
-
-             !sediment burial fluxes of C, N, P
-             !REAL(SP),ALLOCATABLE,DIMENSION(:) :: BURIALC,    & !Burial flux of carbon
-             !                                               !(positive leaving sediment)
-             !                                 BURIALN,    & !Burial flux of nitrogen
-             !                                               !(positive leaving sediment)
-             !                                 BURIALP       !Burial flux of phosphorus
-             !                                               !(positive leaving sediments)
-
-             !sediment carbon diagenesis flux 
-             !REAL(SP), ALLOCATABLE, DIMENSION (:) :: DIAGENC     !carbon diagenesis flux 
-                                                              !gC/m^2/day
-             !WLong moved these to wqm_sed.F 
-             !look up tables for temperathre control used for interpolation at given
-             !temperature
-             !REAL(SP),DIMENSION(350) :: ZHTADP,           &  !not used
-             !                       ZHTADD,           &  !not used
-             !                       ZHTANH4F,         &  !nitrification velocity after applying
-             !                                            !temperature control (m/day)
-             !                                            !for fresh water 
-             !                       ZHTANH4S,         &  !nitrification velocity after
-             !                                            !applying temperature control (m/day) for salt water
-             !                       ZHTANO3F,         &  !layer 1 denitrification velocity after
-             !                                            !applying temperature control (m/day) for fresh water
-             !                       ZHTANO3S,         &  !layer 1 denitrification
-             !                                            !velocity (m/day) after applying
-             !                                            !temperature control 
-             !                       ZHTAK2NO3,         &  !layer 2 denitrifcation
-             !                                            !velocity after applying temperature control (m/day)
-             !                       ZHTA1HSD,           &  !dissolved sulfide oxidation
-             !                                            !rate (m/day) after temperature
-             !                                            !control
-             !                       ZHTA1HSP,           &  !particulate sulfide oxidation
-             !                                            !velocity (m/day) after
-             !                                            !applying temperature control
-             !                       ZHTASI,           &  !particulate biogenic silica
-             !                                            !dissolution velocity after applying temperature
-             !                                            !effect (m/day)
-             !                       ZL12NOM,          &  !sediment porewater mixing
-             !                                            !velocity across layer 1 and layer 2 interface
-             !                                            !after applying temperature control (m/day)
-             !                       ZW12NOM,          &  !sediment particle mixing rate 
-             !                                            !across layer 1, 2 interface
-             !                                            !after applying temperature
-             !                                            !control (m/day)
-             !                       ZHTAPON1,         &  !diagenesis G1 PON reaction
-             !                                            !rate look up table (1/day)
-             !                                            !after applying temperature
-             !                                            !control
-             !                       ZHTAPON2,         &  !diagenesis G2 PON reaction
-             !                                            !rate (1/day) after applying
-             !                                            !temperature control
-             !                       ZHTAPON3,         &  !diagenesis G3 PON reaction
-             !                                            !rate (1/day) after applying
-             !                                            !temperature control
-             !                       ZHTAPOC1,         &  !diagenesis G1 POC reaction
-             !                                            !rate (1/day) after applying
-             !                                            !temperature control
-             !                       ZHTAPOC2,         &  !sediment diagenesis G2 POC
-             !                                            !reaction rate look up table (1/day) after
-             !                                            !applying temperature control 
-             !                       ZHTAPOC3,         &  !sediment diagenesis G3 POC
-             !                                            !reaction rate (1/day) after
-             !                                            !applying temperature control
-             !                       ZHTAPOP1,         &  !sediment diagenesis G1 POP
-             !                                            !reaction rate (1/day) after applying temperature
-             !                                            !control
-             !                       ZHTAPOP2,         &  !sediment diagenesis G2 POP
-             !                                            !reaction rate after applying
-             !                                            !temperature control 
-             !                       ZHTAPOP3,         &  !sediment diagenesis G3 POP
-             !                                            !reaction rate after applying temperature control
-             !                       ZHTACH4              !sediment methane oxidation
-             !                                            !rate look up table (m/day) after applying temperature effect
-
-             !WLong moved these to wqm_sed.F 
-             !time averaged G3 particulate organic flux (mg/m^2/day)
-             !REAL(SP),ALLOCATABLE,DIMENSION(:) :: AG3CFL,  & !G3 sediment POC flux
-             !                                            !(mgC/m^2/day)
-             !                                 AG3NFL,  & !G3 sediment PON flux
-             !                                            !(mgN/m^2/day)
-             !                                 AG3PFL     !G3 sediment POP flux
-             !                                            !(mgP/m^2/day)
-
-
-             !WLong moved this to wqm_sed.F
-             !time averaged sediment temperature (degC)
-             !REAL(SP),ALLOCATABLE,DIMENSION(:) :: ASDTMP  !time averaged sediment
-             !                                         !temperature  (degC)
-
-             !WLong moved this to wqm_sed.F 
-        !     !benthic algae nutrient limitation and kinetic fluxes
-        !     REAL(SP),ALLOCATABLE,DIMENSION(:) :: FIB,      &  !benthic algae growth ligiht
-        !                                                   !limitation (dimensionless)
-        !                                      NLB,      &  !benthic algae growth nitogen
-        !                                                   !limitation ***need to check
-        !                                                   !NH4 limitation ***
-        !                                                   !(dimensionless)
-        !                                      PLB,      &  !benthic algae growth
-        !                                                   !phosphorus limitation
-        !                                                   !(dimensionless)
-        !                                      NPPB,     &  !net primary production of
-        !                                                   !benthic algae (gC/m^2/day ?)
-        !                                      BBM,      &  !benthic algae biomass
-        !                                                   !(gC/m^2 ?)
-        !                                      BLITE,    &  !benthic algae light (light
-        !                                                   !at bottom of water column)
-        !                                                   !(W/m^2)
-        !                                      BMB,      &  !benthic algae basal
-        !                                                   !metabolism  after
-        !                                                   !temperature control (1/day)
-        !                                      PB,       &  !primary production rate of
-        !                                                   !benthic algae
-        !                                      PRB,      &  !predation rate of benthic
-        !                                                   !algae (1/day)
-        !                                      BANH4,    &  !adjustment to benthic NH4
-        !                                                   !flux gN/m^2/day by benthic algae
-        !                                      BANO3,    &  !adjustment to benthic NO3
-        !                                                   !flux gN/m^2/day by benthic
-        !                                                   !algae
-        !                                      BAPO4,    &  !adjustment to benthic PO4
-        !                                                   !flux gP/m^2/day by benthic
-        !                                                   !algae
-        !                                      BADOC,    &  !adjustment to
-        !                                                   !benthic DOC flux by benthic
-        !                                                   !algae (gC/m^2/day)
-        !                                      BADO,     &  !adjustment to
-        !                                                   !benthic DOXG flux by benthic
-        !                                                   !algae (gO2/m^2/day)
-        !                                      BAPOC,    &  !adjustment to benthic POC
-        !                                                   !flux by benthic algae
-        !                                                   !(gC/m^2/day)
-        !                                      BAPON,    &  !adjustment to benthic PON
-        !                                                   !flux by benthic algae
-        !                                                   !(gN/m^2/day)
-        !                                      BAPOP        !adjustment to benthic POP
-        !                                                   !flux by benthic algae
-        !                                                   !(gP/m^2/day)
-
-         !WLong moved this to wqm_sed.F.
-         !POM diagenesis rate temperature theta 
-         !used in setting the temperature control look up tables
-        !    REAL(SP) ::  THTAPOP1,  &  !sediment POP diagenesis reaction temperature theta
-        !                           !(G1)
-        !             THTAPOP2,  &  !(G2)
-        !             THTAPOP3,  &  !(G3)
-        !             THTAPON1,  &  !sediment PON diagenesis reaction temperature theta
-        !                           !(G1)
-        !             THTAPON2,  &  !(G2)
-        !             THTAPON3,  &  !(G3)
-        !             THTAPOC1,  &  !sediment POC diagenesis reaction temperature theta
-        !                           !(G1)
-        !             THTAPOC2,  &  !(G2)
-        !             THTAPOC3      !(G3)
-
-             !WLong removed these equivalences declarations and 
-             !set the corresponding values immediately after they were read from input
-             !control in wqm_sed.F SED_READ subroutin
-             !***** Equivalence declarations
-             !EQUIVALENCE (KPDIAG(1),KPOP1),     & !diagenesis reaction rates (1/day)
-             !            (KPDIAG(2),KPOP2),     & 
-             !            (KPDIAG(3),KPOP3),     &
-             !            (KNDIAG(1),KPON1),     &
-             !            (KNDIAG(2),KPON2),     &
-             !            (KNDIAG(3),KPON3),     &
-             !            (KCDIAG(1),KPOC1),     &
-             !            (KCDIAG(2),KPOC2),     &
-             !            (KCDIAG(3),KPOC3),     &
-             !            (DPTHTA(1),THTAPOP1),  & !diagenesis reaction rate temperature
-             !                                     !thehta
-             !            (DPTHTA(2),THTAPOP2),  &
-             !            (DPTHTA(3),THTAPOP3),  &
-             !            (DNTHTA(1),THTAPON1),  &
-             !            (DNTHTA(2),THTAPON2),  &
-             !            (DNTHTA(3),THTAPON3),  &
-             !            (DCTHTA(1),THTAPOC1),  &
-             !            (DCTHTA(2),THTAPOC2),  &
-             !            (DCTHTA(3),THTAPOC3)
-
-             !WLong moved the following to wqm_sed.F
-             !WLong renamed DP to DPP and DD to DDP here
-             !REAL(SP) :: DPP,           &   !Particulate diffusion coefficient (m2/day)
-             !                           !                                   <==VPMIX
-             !        W2,            &   !Burial velocity (cm/yr)            <==VSED
-             !        DDP,           &   ! porewater diffusion rate (m2/day) <==VDMIX
-             !        H2                 !sediment layer thickness (m) 
-
-             !REAL(SP) :: DPIE1PO4           !sediment 1st layer incremental partition
-             !                           !coefficient for phosphate (L/kg)
-
-             !REAL(SP)  :: KAPPNH4,   &   !sediment layer 1 nitrification velocity (m/day)
-             !                        !not used, replaced by KAPPNH4F and KAPPNH4S
-             !         KAPPNO3       !sediment layer 1 denitrification velocity
-             !                        !(m/day), never used, replaced by KAPPNO3F,
-             !                        !KAPPNO3F
-             !!WLong            KAPPCH4     !sediment layer 1 CH4 oxidation velocity (m/day)
-
-        !WLong moved these to wqm_sed.F
-        !     REAL(SP) :: HS1,           & !sediment 1st layer HS
-        !             HS2,           & !sediment 2nd layer HS
-        !             HST1,          & !sediment 1st layer HS
-        !             HST2,          & !sediment 2nd layer HS
-        !             HS1TM1,        & !sediment 1st layer HS
-        !             HST2TM1,       & !sediment 2nd layer HS
-
-        !     REAL(SP) :: SI0,           & !overlying water Si 
-        !             SI1,           & !sediment layer 1 Si
-        !             SI2,           & !sediment layer 2 Si
-        !             SIT1,          & !sediment layer 1 Si
-        !             SIT2,          & !sediment layer 2 Si
-        !             SI1TM1,        & !sediment layer 1 Si
-        !             SIT2TM1          !sediment layer 2 Si
-        !
-        !     REAL(SP) :: PO40,          & !overlaying water PO4
-        !             PO41,          & !sediment layer 1 PO4
-        !             PO42,          & !sediment layer 2 PO4
-        !             PO4T1,         & !sediment layer 1 PO4
-        !             PO4T2,         & !sediment layer 2 PO4
-        !             PO41TM1,       & !sediment layer 1 PO4
-        !             PO4T2TM1         !sediment layer 2 PO4
-        !
-        !     !sediment POM concentration (all two layers ~= layer 2)
-        !     REAL(SP) :: PON1,          & !sediment PON G1 (mgN/m^3)
-        !             PON1TM1,       &
-        !             PON2,          & !sediment PON G2 
-        !             PON2TM1,       &
-        !             PON3,          & !sediment PON G3
-        !             PON3TM1,       &
-        !             POC1,          & !sediment POC G1 (mgC/m^3)
-        !             POC1TM1,       & 
-        !             POC2,          & !sediment POC G2
-        !             POC2TM1,       &
-        !             POC3,          & !sediment POC G3 
-        !             POC3TM1,       &
-        !             POP1,          & !sediment POP G1 (mgP/m^3)
-        !             POP1TM1,       &
-        !             POP2,          & !sediment POP G2
-        !             POP2TM1,       &
-        !             POP3,          & !sediment POP G3
-        !             POP3TM1
-        !
-        !     !sediment diagenesis flux of C,N, P
-        !
-        !     REAL(SP) :: JNX,           & !depth integrated PON reaction rate (mgN/m^2/day)
-        !             JCX,           & !depth integrated POC reaction rate (mgC/m^2/day)
-        !             JPX              !depth integrated POP reaction rate (mgP/m^2/day)
-        !
-        !     REAL(SP) :: PSISED,        & !sediment particulate biogenic Si (mgSi/m^3)
-        !             PSISEDTM1           !sediment particulate biogenic Si (mgSi/m^3)
-        !
-        !     REAL(SP) :: XJCNO3,        & !Sulfide/methhane oxidation flux due to NO3 used
-        !                              !in denitrifcation (mgN/m^2/day)
-        !             XJCO2,         & !never used
-        !             XJC1           & !cabon diagenesis flux converted to oxygen equivalents 
-        !                              !discounting organic matter used for denirification in layer
-        !                              !1 and layer 2    (gO2/m^2/day)
-        !
-        !     REAL(SP) :: PIE1,          & !sediment 1st layer partition coefficient (L/kg)
-        !                              !temporary variable
-        !             PIE2,          & !sediment 2nd layer partition coefficient (L/kg)
-        !                              !temporary variable
-        !             W12,           & !particle mixing velocity (cm/yr) between Layer 1
-        !                              !and layer 2
-        !             TEMPD,         & !sediment temperature (degC) temporary variable
-        !             O20,           & !overlying water concentration (mgO2/L)
-        !             CH4SAT,        & !saturation concentration of CH4 in sediment pore
-        !                              !water
-        !             SAL              !overlying water salinity  (ppt)
-
-
-        !WLong moved the following to wqm_sed.F
-        !     REAL(SP) :: SALTSW,  &  !  salinity threshold for methane vs sulfide SOD
-        !                         !formulation
-        !             SALTND,  &  ! salinity threshold for freshwater/saltwater
-        !                         !nitrification denitrification
-        !             DLTS        !sediment simulation time step (days)
-
-        !!WLong moved the following to wqm_sed.F
-        !     REAL(SP) :: XAPPNH4,    & !nitrification velocity after applying temp control
-        !                           !(m/day)
-        !             XAPP1HSD,     & !sediment dissolved sulfide reaction rate after
-        !                           !applying temperature effects (m/day)
-        !             XAPP1HSP,     & !sediment particulate sulfide reaction rate after
-        !                           !applying temperature effects (m/day)
-        !             XAPP1NO3,   & !sediment denitrification rate after applying
-        !                           !temmperature effects (m/day)
-        !             XK2NO3,     & !sediment denitrification rate after applying
-        !                           !temperature effects and multiplied by.
-        !                           !layer thickness H2 (for layer 2) (m/day)
-        !             XKSI,       & !sediment particulate bigenic silica dissolution rate
-        !                           !after applying temperature control (m/day), DMD eqn
-        !                           !(7.7)
-        !             XAPPCH4,    & !sediment methane oxidation rate after
-        !                           !applying temperature effects (m/day)
-        !             TEMP20,     & !temperature (degC) - 20
-        !             TEMP202,    & !TEMP20/2.0
-        !             FD1,        & !dissolved fraction of layer 1
-        !                           !FD1 = 1./(1.+M1*PIE1)
-        !             FP1,        & !particulate fraction of layer 1
-        !                           !FP1=M1*PIE1/(1.+M1*PIE1)
-        !             FD2,        & !dissolved fraction of layer 2
-        !                           !FD2 = 1./(1.+M2*PIE2)
-        !             FP2,        & !particulate fraction of layer 2
-        !                           !FP2 =M2*PIE2/(1.+M2*PIE2)
-        !             SOD,        & !sediment oxygen demand (gO2/m^2/day)
-        !             CSOD,       & !chemical (? or carbonaceous ?)oxygem demand (gO2/m^2/day)
-        !             S,          & !SOD/O20 (m/day) sediment powerwater difffusion
-        !                           !velocity (m/day)
-        !             W12NOM,     & !particle mixing velcoity (W12*) (cm/yr), DMD eqn.
-        !                           !(13.2)
-        !             HSO4,       & !depth of SO4 reaction (cm)
-        !             DDSO4,      & !diffusion rate of porewater SO4 (m/day)
-        !             CSODHS,     & !chemical oxygen demand due to HS oxidation
-        !                           !(gO2/m^2/day)
-        !             CSODCH4,    & !chemical oxygen demand due to CH4 oxidation 
-        !                           !(gO2/m^2/day)
-        !             BENSTR,     & !benthic stress
-        !             BENSTRS,    & !benthic stress
-        !             BENSTRTM1,    & !benthic stress
-        !             ISWBEN,     & !flag for re-setting benthic stress to zero
-        !             BFORMAX       !benthic stress limitation temporary variable
-        !                           !(dimensionless)
-        !
-        !     REAL(SP) :: ZHTANH4,    & !look up table value for nitrification rate after
-        !                           !applying temperature control
-        !                           !not used, replaced by ZHTANH4S, ZHTANH4F
-        !             ZHTANO3       !loop up table value for denitrification rate after
-        !                           !applying temperature control
-        !                           !not used, replaced by ZHTANO3F. ZHTANO3S
-
-             !mass balance calculations of C,N, P in the system
-             !WLong: Note these are local processor sums of flux
-             !so for global balance, we would need to use MPI gather methods
-
+    
         !WLong moved these to mod_sed.F
         !     REAL(SP) :: SEDMN,      & !total sediment organic nitrogen  (kgN)
         !             SEDMP,      & !total sediment organic phosphorus (kgP)
@@ -2279,8 +1671,20 @@ MODULE MOD_WQM
            !ALLOCATE(LDOC(0:MTLOC,KBM1));  LDOC = 0.0
            ALLOCATE(LPOC(0:MTLOC,KBM1));  LPOC = 0.0
            ALLOCATE(RPOC(0:MTLOC,KBM1));  RPOC = 0.0
+	
+		   !Below added by B Clark Feb 2019 For Budget Calculation
+		   ALLOCATE(DTRPOC_out(MTLOC,KBM1)); DTRPOC_out=0.
+		   ALLOCATE(DTLPOC_out(MTLOC,KBM1)); DTLPOC_out=0.
+		   ALLOCATE(DTRPON_out(MTLOC,KBM1)); DTRPON_out=0.
+		   ALLOCATE(DTLPON_out(MTLOC,KBM1)); DTLPON_out=0.
+		   
            ALLOCATE(NH4(0:MTLOC,KBM1));   NH4  = 0.0
            ALLOCATE(NO3(0:MTLOC,KBM1));   NO3  = 0.0
+
+           ALLOCATE(DTNH4_out(1:MTLOC,KBM1));   DTNH4_out  = 0.0
+           ALLOCATE(DTNO3_out(1:MTLOC,KBM1));   DTNO3_out  = 0.0		   
+		   
+		   
            !ALLOCATE(LDON(0:MTLOC,KBM1));  LDON = 0.0
            ALLOCATE(LPON(0:MTLOC,KBM1));  LPON = 0.0
            ALLOCATE(RPON(0:MTLOC,KBM1));  RPON = 0.0
@@ -2550,13 +1954,13 @@ MODULE MOD_WQM
            
            ALLOCATE(C1(0:MTLOC,KBM1,NCP));         C1    = 0.0
            ALLOCATE(C2(0:MTLOC,KBM1,NCP));         C2    = 0.0
-		   ALLOCATE(C3(0:MTLOC,KBM1,NAC));         C3    = 0.0 ! B Clark added so that the work array in advection model is smaller than c2, should speed up a bit Sep 29 2015
+		!    ALLOCATE(C3(0:MTLOC,KBM1,NAC));         C3    = 0.0 ! B Clark added so that the work array in advection model is smaller than c2, should speed up a bit Sep 29 2015
            ALLOCATE(C2F(0:MTLOC,KBM1,NCP));        C2F    = 0.0
            ALLOCATE(CSTAR(0:MTLOC,KBM1,NCP));      CSTAR = 0.0
            ALLOCATE(DTC(0:MTLOC,KBM1,NCP));        DTC   = 0.0 
            ALLOCATE(AC1(0:MTLOC,KBM1,NCP));        AC1   = 0.0
 		   
-		   ALLOCATE(XFLUX(0:MTLOC,KBM1,NCP))
+           ALLOCATE(XFLUX(0:MTLOC,KBM1,NCP))
            ALLOCATE(XFLUX_ADV(0:MTLOC,KBM1,NCP))
            
            ALLOCATE(QLIT(MTLOC,KBM1));             QLIT = 0.0
@@ -2894,8 +2298,18 @@ MODULE MOD_WQM
            !IF(ALLOCATED(LDOC))DEALLOCATE(LDOC)
            IF(ALLOCATED(LPOC))DEALLOCATE(LPOC)
            IF(ALLOCATED(RPOC))DEALLOCATE(RPOC)
+		   
+           IF(ALLOCATED(DTLPOC_out))DEALLOCATE(DTLPOC_out)
+           IF(ALLOCATED(DTRPOC_out))DEALLOCATE(DTRPOC_out)
+           IF(ALLOCATED(DTLPON_out))DEALLOCATE(DTLPON_out)
+           IF(ALLOCATED(DTRPON_out))DEALLOCATE(DTRPON_out)
+		   
            IF(ALLOCATED(NH4))DEALLOCATE(NH4)
            IF(ALLOCATED(NO3))DEALLOCATE(NO3)
+		   
+           IF(ALLOCATED(DTNH4_out))DEALLOCATE(DTNH4_out)
+           IF(ALLOCATED(DTNO3_out))DEALLOCATE(DTNO3_out)		   
+		   
            !IF(ALLOCATED(LDON))DEALLOCATE(LDON)
            IF(ALLOCATED(LPON))DEALLOCATE(LPON)
            IF(ALLOCATED(RPON))DEALLOCATE(RPON)
@@ -3191,7 +2605,7 @@ MODULE MOD_WQM
            IF(ALLOCATED(DTC))DEALLOCATE(DTC)
            IF(ALLOCATED(AC1))DEALLOCATE(AC1)
            
-		   IF(ALLOCATED(XFLUX)) DEALLOCATE (XFLUX)
+           IF(ALLOCATED(XFLUX)) DEALLOCATE (XFLUX)
            IF(ALLOCATED(XFLUX_ADV)) DEALLOCATE (XFLUX_ADV)
 		   
            IF(ALLOCATED(QLIT))DEALLOCATE(QLIT)

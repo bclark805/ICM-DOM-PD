@@ -9,8 +9,11 @@
    USE MOD_LIMS, ONLY: KB, MYID, NPROCS, NCV,NUMPNT &
 				  ,MLOC, MTLOC, NTLOC, KBM1, NCV_I
    USE MOD_PREC, ONLY : SP
-   
-   	
+#if defined(XFLUX_FLAG)
+   USE MOD_OUTPUT_FLUX, ONLY: NEL_LOC, I_EDGELINE_ELE_EDGE_IA, &
+								  I_EDGELINE_ELE_EDGE_IB, &
+								  EDGELINE_FLUX, I_EDGELINE_FLUX_SIGN
+#endif								  
    USE MOD_TGE, ONLY : 		&!
 				 ISONB		&!
 				,NTSN		&!
@@ -260,10 +263,9 @@
 			!LOCK, & !
 			!UNLOCK, & !
 			!GETLOC !
-			 
-			 
-			 
+		 
 # endif
+
    IMPLICIT NONE
 !   REAL(SP), ALLOCATABLE, DIMENSION(:,:,:)  :: XFLUX,XFLUX_ADV
    REAL(SP), DIMENSION(MLOC)           :: PUPX,PUPY,PVPX,PVPY
@@ -277,7 +279,7 @@
    REAL(SP) :: TT,TTIME,STPOINT,STPOINT1,STPOINT2
    INTEGER  :: I,I1,I2,IA,IB,IC,J,J1,J2,JTMP,K,JJ,		&
 				JCON,									&	!Index for constituents
-				II
+				II,IX
    REAL(SP) :: C21MIN, C21MAX, C22MIN, C22MAX
 ! KURT GLAESEMANN, fix C2MEAN size
 !  REAL(SP) :: C2MEAN(MLOC,KBM1,NCP)
@@ -290,9 +292,8 @@
 !TYKIM for nonpoint sources
   INTEGER :: L1, L2, IERR
   REAL(SP)    :: UFACT, DFACT
-  
-  
- REAL(SP) :: Nodal_V, Nodal_U, USTAR
+    
+  REAL(SP) :: Nodal_V, Nodal_U, USTAR
   REAL(SP) :: Kappa = 0.41 ! Von Karman's constants
 !------------------------------------------------------------------------------
 !  KURT GLAESEMANN 11 SEPT 2009 C2MEAN IS ZERO
@@ -372,7 +373,8 @@
 ! KURT GLAESEMANN 10 SEPT 2009 - C2MEAN IS ZERO
 !          PFPXD(I)=PFPXD(I)+FFD*(VY(I1)-VY(I2))
 !          PFPYD(I)=PFPYD(I)+FFD*(VX(I2)-VX(I1))
-         ENDDO
+		 ENDDO
+
          PFPX(I)=PFPX(I)/ART2(I)  ! di  !   ! total area of surrounding elements
          PFPY(I)=PFPY(I)/ART2(I)   ! g  / m^4
 ! KURT GLAESEMANN 10 SEPT 2009 - C2MEAN IS ZERO
@@ -386,51 +388,15 @@
 		 		 	 
        ENDDO
 	   
-	   
+	!    write(*,*)'NCV_I = ',NCV_I
 
-       DO I=1,NCV_I ! loop over total number of control volumes (local)
-         IA=NIEC(I,1) ! counting number of left and right elements
+	   DO I=1,NCV_I ! loop over total number of control volumes (local)
 		
-         IB=NIEC(I,2)
-
-! KURT GLAESEMANN - 20% faster total run time - split UN > 0 and UN < 0 cases, and explicit loops for MAXVAL
-!         DXA=XI-VX(IA)
-!         DYA=YI-VY(IA)
-!         DXB=XI-VX(IB)
-!         DYB=YI-VY(IB)
-!         FIJ1=C2(IA,K,II)+DXA*PFPX(IA)+DYA*PFPY(IA)
-!         FIJ2=C2(IB,K,II)+DXB*PFPX(IB)+DYB*PFPY(IB)
-!
-!         C21MIN=MINVAL(C2(NBSN(IA,1:NTSN(IA)-1),K,II))
-!         C21MIN=MIN(C21MIN, C2(IA,K,II))
-!         C21MAX=MAXVAL(C2(NBSN(IA,1:NTSN(IA)-1),K,II))
-!         C21MAX=MAX(C21MAX, C2(IA,K,II))
-!         C22MIN=MINVAL(C2(NBSN(IB,1:NTSN(IB)-1),K,II))
-!         C22MIN=MIN(C22MIN, C2(IB,K,II))
-!         C22MAX=MAXVAL(C2(NBSN(IB,1:NTSN(IB)-1),K,II))
-!         C22MAX=MAX(C22MAX, C2(IB,K,II))
-!         IF(FIJ1 < C21MIN) FIJ1=C21MIN
-!         IF(FIJ1 > C21MAX) FIJ1=C21MAX
-!         IF(FIJ2 < C22MIN) FIJ2=C22MIN
-!         IF(FIJ2 > C22MAX) FIJ2=C22MAX
-!      
-!         UN=UVN(I,K)
-!
-!         VISCOF=XYDF*(FACT*(VISCOFF(IA)+VISCOFF(IB))*0.5 + FM1)
-!        
-!         TXX=0.5*(PFPXD(IA)+PFPXD(IB))*VISCOF
-!         TYY=0.5*(PFPYD(IA)+PFPYD(IB))*VISCOF
-!          
-!         FXX=-DTIJ(I)*TXX*DLTYE(I)
-!         FYY= DTIJ(I)*TYY*DLTXE(I)
-!          
-!         EXFLUX=-UN*DTIJ(I)*((1.0+SIGN(1.0,UN))*FIJ2+                &
-!                 (1.0-SIGN(1.0,UN))*FIJ1)*0.5+FXX+FYY
-!          
-
+		 IA=NIEC(I,1) ! counting number of left and right elements
+		 IB=NIEC(I,2)
+		 
          UN=UVN(I,K)  ! normal velocity
 		 
-
 !  KURT GLAESEMANN 10 SEPT 2009 - convert FACT and FM1 to logic
          IF(XYDFUISON)THEN
             VISCOF=XYDF*((VISCOFF(IA)+VISCOFF(IB))*0.5)
@@ -444,13 +410,6 @@
 !        TYY=0.5*(PFPYD(IA)+PFPYD(IB))*VISCOF
          TXX=0.5*(PFPX (IA)+PFPX (IB))*VISCOF  ! Take the average of both left and right nodes multiplied by the diffusion coeff to get a flux  ( g /m ^4 * m^2/s ---> g /m^2/s)
          TYY=0.5*(PFPY (IA)+PFPY (IB))*VISCOF
-
-         ! IF (D(IA) .LE. 0.0501 .OR. D(IB) .LE. 0.0501) THEN  ! B Clark and W
-         !                                                     !Long add in block
-         !                                                     !for diffusion
-         !   TXX = 0.0
-         !   TYY = 0.0
-         ! ENDIF
 
          FXX=-DTIJ(I)*TXX*DLTYE(I)  ! Previous time step depth * flux * y distance on this edge = g /s
          FYY= DTIJ(I)*TYY*DLTXE(I)
@@ -475,16 +434,38 @@
          IF(FIJ2 < C22MIN) FIJ2=C22MIN
          IF(FIJ2 > C22MAX) FIJ2=C22MAX
 !caps above for minmax criteria
-         EXFLUX=-UN*DTIJ(I)*FIJ2+FXX+FYY
+		 
+		 EXFLUX=-UN*DTIJ(I)*FIJ2+FXX+FYY
+         
 ! END KURT
+		 !Below added by B Clark, NASA GSCF March 2020
+		 ! to get xflux across
+		 !control volume faces we care about
+		 !Edgeline_IA and Edgline_IB are the two nodes we care about
+		 !positive flux is out of the transect
+		 !negative flux is into the transect
+#if defined(XFLUX_FLAG)		 
+      IF(NEL_LOC>0)THEN
+		 DO IX=1,NEL_LOC
 
+			IF(IA==I_EDGELINE_ELE_EDGE_IA(IX) .AND. & 
+			  (IB) == I_EDGELINE_ELE_EDGE_IB(IX)) THEN
+
+			   EDGELINE_FLUX(IX,K,II)=EXFLUX*i_edgeline_flux_sign(IX)
+
+		    ENDIF
+		 ENDDO
+	 ENDIF
 			 
+#endif
          XFLUX(IA,K,II)=XFLUX(IA,K,II)+EXFLUX
          XFLUX(IB,K,II)=XFLUX(IB,K,II)-EXFLUX
 
          XFLUX_ADV(IA,K,II)=XFLUX_ADV(IA,K,II)+(EXFLUX-FXX-FYY)
-         XFLUX_ADV(IB,K,II)=XFLUX_ADV(IB,K,II)-(EXFLUX-FXX-FYY)
-       ENDDO
+		 XFLUX_ADV(IB,K,II)=XFLUX_ADV(IB,K,II)-(EXFLUX-FXX-FYY)
+		 
+	   ENDDO
+
      ENDDO
    ENDDO
 
@@ -512,20 +493,6 @@
 		 
 		 
 		 ShearStress(I)=RHO1(I,KBM1)*USTAR**2 ! sheer stress from density and ustar
-		 
-		 !if(NGID(I)==8138) THEN
-		 !write(*,*)'NTVE = ',NTVE(I)
-		 !write(*,*)'Depth = ',D(I)*DZ(KBM1)
-		 !write(*,*)'Velocity = ',Nodal_V,Nodal_U
-		 !write(*,*)'Ustar = ',USTAR
-		 !write(*,*)'Tau = ',ShearSTress(I)
-		 !endif
-	 !!IF(MSR) THEN 
-	!	 IF(NGID(I) == 5856) THEN
-	!	
-	!	     write(*,*)' SHear Stress at Dock = ', ShearStress(I)
-	!		 write(*,*)' Rho1 = ',RHO1(I,KBM1)
-	 !    ENDIF
 		 
 		 
    ENDDO
@@ -634,7 +601,7 @@
         DO K=1,KBM1
          STPOINT = PWQDIS(J,II)
 !         STPOINT = C2(J,K,II)
-          XFLUX(JJ,K,II)=XFLUX(JJ,K,II)-PQDIS(J)*WVQDIST(J,K)*STPOINT/DZ(K)
+         XFLUX(JJ,K,II)=XFLUX(JJ,K,II)-PQDIS(J)*WVQDIST(J,K)*STPOINT/DZ(K)
         ENDDO
       ENDDO
     ENDIF
@@ -652,7 +619,6 @@
 !      IF(MOD(ELTMS,WQ_DT).eq.0) THEN
           
 			C1(I,K,II)=(C2(I,K,II)-XFLUX(I,K,II)*TMP1(I))*TMP2(I)!+DTM(I,K,II)*DLT ! See below, DTM is now added after flux limiter
-		  
 		    !wen long:
 			!DTM should have unit of concentration/sec	
 			!DLT should have unit of sec, which is the time step
@@ -665,11 +631,31 @@
           
 !ORI        C1(I,K,II)=(C2(I,K,II)-XFLUX(I,K,II)/ART1(I)*(DLT/DT(I)))*   &
 !                         (DT(I)/DTFA(I))+DTM(I,K,II)*DLT
-			
-			
-           C2F(I,K,II) = MAX( C1(I,K,II),  10E-15 )
+				! IF(II==27 .or. II==35)then
+				! 	if(K==3)then
+				! 		if(NGID(I)==7849) THEN
+				! 			write(*,*)'II = ',II
+				! 			write(*,*)'C1 before assignment = ',C1(I,K,II)
+				! 			write(*,*)'XFLUX before assignment = ',XFLUX(I,K,II)
 
-           IF(II.EQ.4.OR.II.EQ.5.OR.II.EQ.6)C2F(I,K,II)=MAX( C1(I,K,II), 0.003)  !make sure there are seeds for ALG1,2 and 3
+				! 		endif 
+				! 	endif
+				! endif
+		    ! C2F(I,K,II)=C1(I,K,II)
+			  C2F(I,K,II)=MAX(C1(I,K,II),1.e-15)
+			! IF(II==27 .or. II==35)then
+			! 	if(K==3)then
+			! 		if(NGID(I)==7849) THEN
+			! 			write(*,*)'II = ',II
+			! 	        write(*,*)'C2F after assignment = ',C2F(I,K,II)
+			! 		endif 
+			! 	endif
+			! endif
+            !   C2F(I,K,II) = MAX( C1(I,K,II),  10E-15 )
+			! if(C2F(I,K,II)<=0.)THEN
+			! 	C2F(I,K,II) = 1E-10;
+			! endif
+        !    IF(II.EQ.4.OR.II.EQ.5.OR.II.EQ.6)C2F(I,K,II)=MAX( C1(I,K,II), 0.003)  !make sure there are seeds for ALG1,2 and 3
 
          ENDDO
      ENDDO
@@ -677,19 +663,37 @@
    ENDDO
    
    
-   CALL  FCT_NUT  ! Moved here by B Clark to fix problem with reaction/ source sink terms being smoothed out by FCT_NUT
+     CALL  FCT_NUT  ! Moved here by B Clark to fix problem with reaction/ source sink terms being smoothed out by FCT_NUT
                   ! Now, the change in concentration is updated after the flux control is put in place
    
     DO JCON=1,NAC
      II = AC(JCON)
        DO K=1,KBM1
-         DO I=1,MLOC
-!               write(*,*)'C2F before = ',C2F(I,K,II)
-		 
-			C2F(I,K,II)=C2F(I,K,II) + DTM(I,K,II)*DLT
-			
-                  C2F(I,K,II) = MAX( C2F(I,K,II), 10E-15 )
-			IF(II.EQ.4.OR.II.EQ.5.OR.II.EQ.6)C2F(I,K,II)=MAX( C2F(I,K,II), 0.003)  !make sure there are seeds for ALG1,2 and 3
+		 DO I=1,MLOC
+			! IF(II==27 .or. II==35)then
+			! 	if(K==3)then
+			! 		if(NGID(I)==7849) THEN
+			! 			write(*,*)'II = ',II
+			! 			write(*,*)'C2F before DTM = ',C2F(I,K,II)
+			! 			write(*,*)'DTM = ',DTM(I,K,II)
+			! 		endif 
+			! 	endif
+			! endif
+			 C2F(I,K,II)=C2F(I,K,II) + DTM(I,K,II)*DLT
+			   C2F(I,K,II) = DMAX1 ( C2F(I,K,II), 1.e-15 )
+			! if(C2F(I,K,II)<=0.)THEN
+			! 	C2F(I,K,II) = 1E-10;
+			! endif
+			! IF(II==27 .or. II==35)then
+			! 	if(K==3)then
+			! 		if(NGID(I)==7849) THEN
+			! 			write(*,*)'II = ',II
+            !             write(*,*)'C2F AFTER DTM = ',C2F(I,K,II)
+			! 		endif 
+			! 	endif
+			! endif
+            !       C2F(I,K,II) = MAX( C2F(I,K,II), 10E-15 )
+			! IF(II.EQ.4.OR.II.EQ.5.OR.II.EQ.6)C2F(I,K,II)=MAX( C2F(I,K,II), 0.003)  !make sure there are seeds for ALG1,2 and 3
                !write(*,*)'C2F after= ',C2F(I,K,II)
 
          ENDDO

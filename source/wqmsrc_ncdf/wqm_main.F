@@ -21,7 +21,7 @@
 !**  Removal of Ocean boundary conditions faces from DATA statements   **
 !**  read as ASCII from wqm_map file   MNOEL  2-10-93                  **
 !**  additional parameters made spacially variable-- note preprocessor **
-!**  needed to produce ASCII input file (parameters specified by       **
+!**  needed to produce ASCII input file (parameters specified by       **C
 !**  Cerco)   MNOEL 2-20-93                                            **
 !**  Modified Kinetic flux output to be aggregated temporally and to   **
 !**  write for every box in a binary output file                       **
@@ -375,8 +375,9 @@
                 ELTMS,          &!
                 ELTMS1,         &!
                 ELTMJD,         &!
+                XFLUX, &!
 
-
+                ! XFLUX_OUT,  &
                 WQ_DT,          &!    
 
                 SEDIMENT_CALC,  &!
@@ -726,7 +727,10 @@
 				HDRLPOC_OUT,  &! 
 				
 				HDRRPOC,  & ! Hydrolysis of RPOC to DOC
-				HDRRPOC_OUT
+				HDRRPOC_OUT,  &
+				DTLPOC_out, DTRPOC_out,  &
+				DTLPON_out, DTRPON_out, &
+				DTNH4_out, DTNO3_out
 
                 
     USE MOD_OWQ, ONLY:                  & 
@@ -1486,6 +1490,10 @@
         SODTM1S,            &
         JNH4TM1S,     & 
         JNO3TM1S,     & 
+		
+		JNH4_out, &!Added By B Clark Feb 2019 for Budget calculation
+		JNO3_out, &
+		
         JPO4TM1S,     & 
         JCH4TM1S,     & 
         JCH4GTM1S,    & 
@@ -1692,7 +1700,11 @@
         
        JPOC,         &!
       JPON,         &!
-      JPOP,         &!                
+      JPOP,         &!  
+	  
+	  !B Clark Feb 2019
+	  JPOC_out, JPON_out, &
+	  
       JPOS,         &!
       JPOCaccum,         &!
       JPONaccum,         &!
@@ -2210,8 +2222,13 @@
 								!J_LDOP_SHARE, J_RDOP_SHARE       ! g /m^2/day
 #endif								 
  USE WC_DOM, ONLY : WC_DOM_ALLOCATE,WC_DOM_DEALLOCATE,      &
-                        ZOOP_DOM, DOC, DON, DOP, WC_CDOC1, WC_CDOC2, WC_CDOC3,   &
-						WC_NCDOC1, WC_NCDOC2, WC_NCDOC3,    &
+                        ZOOP_DOM, DOC, DON, DOP, & 
+
+                        WC_CDOC1, WC_CDOC2, WC_CDOC3,   &
+                        WC_NCDOC1, WC_NCDOC2, WC_NCDOC3,    &
+                        XFLUX_CDOC1, XFLUX_CDOC2, XFLUX_CDOC3,   &
+                        XFLUX_NCDOC1, XFLUX_NCDOC2, XFLUX_NCDOC3,    &   
+
 						WC_CDON1, WC_CDON2, WC_CDON3, &
 						WC_NCDON1, WC_NCDON2, WC_NCDON3,  &
 						WC_CDOP1, WC_CDOP2, WC_CDOP3,  &
@@ -2222,19 +2239,37 @@
 						DTWCDON3,DTWNCDON3,   & 
 						DTWCDOP1,DTWNCDOP1,DTWCDOP2,DTWNCDOP2,   &
 						DTWCDOP3,DTWNCDOP3  ,  &
+						DTWCDOC1_out,DTWNCDOC1_out,DTWCDOC2_out,DTWNCDOC2_out,   &
+						DTWCDOC3_out,DTWNCDOC3_out,   & 
+						DTWCDON1_out,DTWNCDON1_out,DTWCDON2_out,DTWNCDON2_out,   &
+						DTWCDON3_out,DTWNCDON3_out,   & 
+						DTWCDOP1_out,DTWNCDOP1_out,DTWCDOP2_out,DTWNCDOP2_out,   &
+						DTWCDOP3_out,DTWNCDOP3_out  ,  &
    					  COAGN_OUT, COAGN, COAGC_OUT, COAGC,   &!
 					  MNLDOC, &
 					  MNLDOC1_OUT,MNLDOC2_OUT,MNLDOC3_OUT,   &!
 					  MNLDOC1,MNLDOC2,MNLDOC3,   &!
 					  MNLDON1_OUT,MNLDON2_OUT,MNLDON3_OUT,   &!
 					  MNLDON1,MNLDON2,MNLDON3, &
-					  PHOTOCHEM_DOC_ACCUM, PHOTOCHEM_DOC_ACCUM_OUT
+					  PHOTOCHEM_DOC_ACCUM, PHOTOCHEM_DOC_ACCUM_OUT, &
+					  MyVolumeTM1
 
 						
 USE MOD_NCDIO, ONLY : CDF_OUT, &
 					  CDF_COUNTER, &
 					  OUT_NETCDF, & 
-					  CDF_INT
+					  CDF_INT, &
+            CDF_START,CDF_END
+            
+!B Clark March 2020
+#if defined(XFLUX_FLAG)            
+ USE MOD_OUTPUT_FLUX, ONLY: EDGELINE_FLUX,  &
+                            EDGELINE_FLUX_IN, &
+                            WRITE_EDGELINE_FLUX, &
+                            IOFILES_FLUX, &
+                            DEALLOC_EDGELINE_FLUX
+
+#endif                                     
 						
    IMPLICIT NONE
 # if defined (MULTIPROCESSOR)
@@ -2255,6 +2290,9 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 
    INTEGER :: I1,I2
    REAL(SP)    :: ITT,TTMP1,TTMP2
+   
+   REAL(SP) :: MyVolume
+   
 !RGl added WQ_DT, above
 !WLong moved this to mod_sed.F
 ! Restart printout variables below - KURT GLAESEMANN
@@ -2359,6 +2397,10 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    CALL INIT_FILE_INFO()    !  Setup MOD_WQM file information
    
    CALL INPUTS()            !  Initialze 
+
+# if defined(XFLUX_FLAG)   
+   CALL IOFILES_FLUX
+# endif   
   
    IF(SEDIMENT_CALC)THEN
    
@@ -2370,7 +2412,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 #if defined(SEDIMENT_DOM)       
 		IF(SED_DOM)THEN
 		
-            CALL SED_DOM_SHARE_ALLOCATE  ! B CLARK SED_DOM UPDATE
+      CALL SED_DOM_SHARE_ALLOCATE  ! B CLARK SED_DOM UPDATE
 			SED_DOM_FLAG = SED_DOM  ! logical to pass to mod_wc_dom
 	    ENDIF
 #endif			
@@ -2417,6 +2459,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    
    WC_CDOC1(:,:) = C2(:,:,9)
    WC_NCDOC1(:,:) = C2(:,:,10)
+  
    !LDOC(:,:) = C2(:,:,9)
    !RDOC(:,:) = C2(:,:,10)
    LPOC(:,:) = C2(:,:,11)
@@ -2450,8 +2493,11 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    
    WC_CDOC2(:,:) = C2(:,:,33)
    WC_NCDOC2(:,:) = C2(:,:,34)
+
    WC_CDOC3(:,:) = C2(:,:,35)
    WC_NCDOC3(:,:) = C2(:,:,36)
+
+
    WC_CDON2(:,:) = C2(:,:,37)
    WC_NCDON2(:,:) = C2(:,:,38)
    WC_CDON3(:,:) = C2(:,:,39)
@@ -2466,8 +2512,18 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 !************************************************************************
 !**                          Begin Simulation                          **
 !************************************************************************
-   
-   
+   D   = H+ELNC1
+   DO I = 1,MLOC
+    DO K=1,KBM1
+     MyVolumeTM1(I,K)=(D(I)*DZ(K)*ART1(I)) 
+    !  write(*,*)'Initial VOlume = ',MyVolumeTM1(I,K)
+    !  write(*,*)'Initial DZ = ',DZ(K)
+    !  write(*,*) 'Initial D =',D(I)
+    !  write(*,*)'Initial ART1 = ',ART1(i)
+    ENDDO
+  ENDDO
+
+
    DO WHILE(.NOT.END_RUN)
 	 NPROFILE=0
      IINT=IINT+1
@@ -2617,11 +2673,11 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    C2(:,:,2)  = SALT(:,:)
 
 !******* Dead sea case
-     IF(.NOT. FLOW)THEN
-       UU  = 0.0
-       VV  = 0.0
-       WTS = 0.0
-     ENDIF
+    !  IF(.NOT. FLOW)THEN
+    !    UU  = 0.0
+    !    VV  = 0.0
+    !    WTS = 0.0
+    !  ENDIF
 
      IF(.NOT. Z_DIFFUSION) KH = 0.0  
 
@@ -2662,17 +2718,11 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
             IF (JDAY >= NXKEI) THEN
                 NXKEI = NXKEI + INTKE/24. 
 
-                IF (I0 > 0. .OR. IAVG(1,1) > 0.) CALL LGHT_ATTN    !calculate light attenuation 
+                  IF (I0 > 0. .OR. IAVG(1,1) > 0.) CALL LGHT_ATTN    !calculate light attenuation 
             ENDIF
         ENDIF        
     ENDIF
 
-!******* SAV Submodel
-
-     SAVENT = -9999
-     IF (SAV_CALC) THEN
-       CALL SAV_COMP
-     ENDIF
 
 !******* Determine cell quota for this time step
 !WLong and LB reactivated calculation of Q1,Q2,Q3
@@ -2681,9 +2731,6 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
          Q1(I,K) = PIB1(I,K)/(B1(I,K)+1.0E-9)  !Phosphorus to Carbon Ration in Alg 1 (gP/gC)
          Q2(I,K) = PIB2(I,K)/(B2(I,K)+1.0E-9)  !Phosphorus to Carbon Ration in Alg 2 (gP/gC)
          Q3(I,K) = PIB3(I,K)/(B3(I,K)+1.0E-9)    !Phosphorus to Carbon Ration in Alg 1 (gP/gC)
-         
-         !WLong and LB: for testing sediment diageesis
-         !WLong and LB: I'm going to give a constant value
          
          IF(SEDIMENT_CALC.AND.ACC(30)=='OFF')THEN
                 Q1(I,K)=0.0243
@@ -2697,32 +2744,12 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
          
        ENDDO  
      ENDDO
-!#if(0)        
-!!******* Sediment kinetics
 
-!     SEDENT = -9999
-!     IF (SEDIMENT_CALC) THEN
-
-!        !WRITE(*,*)'LLLLL before steady state calculation, JDAY, TMSTRT, DLTS', JDAY, TMSTRT, DLTS
-!        !set initial condition using steady state calculation 
-!        IF(STEADY_STATE_SED_IC.AND.(JDAY<TMSTRT+DLT/86400.0))THEN
-!            CALL SED_CALC(.TRUE.)  !True means use steady state solution as initial condition in sediment module
-!            CALL SED_INIT2           !set the initial conditions using the calcualated value            
-!        ENDIF
-!        CALL SED_CALC(.FALSE.) !FALSE means use time-varying calculation
-!    
-!        
-!     ELSE IF (BENTHIC_FLUXES) THEN
-!       CALL BEN_FLUX
-!     ENDIF
-!#endif
 	 IF(MSR)THEN
 		TOTAL_TIME_PROFILE=DTIME(ELAPSED_PROFILE)
 		NPROFILE=NPROFILE+1
 	 ENDIF
 	 
-   
-
 !******* Water column kinetics
 !     IF (TEMPERATURE_CALC) CALL TEMPER(DTC(0,1,1))
 !tykim-this makes change in temperature zero - need to comment out if want to calc temp
@@ -2730,16 +2757,16 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 !In next section first subscript changed to 0 per KURT 
 		
 	 
-      IF (SOLIDS_CALC)      CALL SOLIDS(DTC(0,1,3),FLUXS(0,1,1))  !WLong and LB, we should move this into the IF block below as well??
+       IF (SOLIDS_CALC)      CALL SOLIDS(DTC(0,1,3),FLUXS(0,1,1))  !WLong and LB, we should move this into the IF block below as well??
 
-      IF(MOD(ELTMS,WQ_DT).eq.0) THEN
-!RGL added sub cycling of ecosystem model, above
-!WL  IF(MSR) WRITE(*,*)'calling ecosystem model'
+       IF(MOD(ELTMS,WQ_DT).eq.0) THEN
+! !RGL added sub cycling of ecosystem model, above
+! !WL  IF(MSR) WRITE(*,*)'calling ecosystem model'
 
-       IF (ZOO_CALC)    THEN     
-	      CALL ZOOPL(DTC(0,1,7),DTC(0,1,8))
-		  CALL ZOOP_DOM
-	   ENDIF
+!     !    IF (ZOO_CALC)    THEN     
+! 	  !     CALL ZOOPL(DTC(0,1,7),DTC(0,1,8))
+! 		!   CALL ZOOP_DOM
+! 	  !  ENDIF
 	   
        IF (ALGAE_CALC)         &
         CALL ALGAE(DTC(0,1,4),DTC(0,1,5),DTC(0,1,6),FLUXS(0,1,2),      &
@@ -2747,72 +2774,72 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
        IF (CARBON_CALC)     THEN 
 	       CALL PARTICULATE_CARBON(DTC(0,1,11),DTC(0,1,12) , FLUXS(0,1,5))   ! DTC(0,1,9) DTC(0,1,10)  ! old DOC
 	       CALL DOC
-		    DTC(:,:,9) = DTWCDOC1
-			DTC(:,:,10) = DTWNCDOC1
-			DTC(:,:,33) = DTWCDOC2
-			DTC(:,:,34) = DTWNCDOC2
-			DTC(:,:,35) = DTWCDOC3
-			DTC(:,:,36) = DTWNCDOC3
-	   ENDIF 
+		     DTC(:,:,9) = DTWCDOC1
+			   DTC(:,:,10) = DTWNCDOC1
+			   DTC(:,:,33) = DTWCDOC2
+			   DTC(:,:,34) = DTWNCDOC2
+			   DTC(:,:,35) = DTWCDOC3
+			   DTC(:,:,36) = DTWNCDOC3
+	     ENDIF 
        IF (NITROGEN_CALC)     THEN
 	        CALL NITROG(DTC(0,1,13) ,DTC(0,1,14), &  !,DTC(0,1,16)  DTC(0,1,17), old ldon and rdon
                                       DTC(0,1,18),DTC(0,1,19),  &
                                        FLUXS(0,1,6))
 	        CALL DON
-			
-			 DTC(:,:,16) = DTWCDON1    
-			 DTC(:,:,17) = DTWNCDON1   
-			 DTC(:,:,37) = DTWCDON2   
-			 DTC(:,:,38) = DTWNCDON2 
-			 DTC(:,:,39) = DTWCDON3
-			 DTC(:,:,40) = DTWNCDON3
-			 
-	   ENDIF
+          DTC(:,:,16) = DTWCDON1    
+			    DTC(:,:,17) = DTWNCDON1   
+			    DTC(:,:,37) = DTWCDON2   
+			    DTC(:,:,38) = DTWNCDON2 
+			    DTC(:,:,39) = DTWCDON3
+			    DTC(:,:,40) = DTWNCDON3
+			 ENDIF
 		
-       IF (PHOSPHORUS_CALC)    THEN  
-           CALL PHOSPH(DTC(0,1,20),DTC(0,1,23),&  !DTC(0,1,21),DTC(0,1,22), these are old ldop and rdop
-                   DTC(0,1,24),DTC(0,1,25),DTC(0,1,30),DTC(0,1,31),    &
-                   DTC(0,1,32),FLUXS(0,1,7),FLUXS(0,1,8),FLUXS(0,1,9))
+!       IF (PHOSPHORUS_CALC)    THEN  
+!           CALL PHOSPH(DTC(0,1,20),DTC(0,1,23),&  !DTC(0,1,21),DTC(0,1,22), these are old ldop and rdop
+!                   DTC(0,1,24),DTC(0,1,25),DTC(0,1,30),DTC(0,1,31),    &
+!                   DTC(0,1,32),FLUXS(0,1,7),FLUXS(0,1,8),FLUXS(0,1,9))
 		
-	       CALL DOP 
-		   
-		        DTC(:,:,21) = DTWCDOP1
-				DTC(:,:,22) = DTWNCDOP1
-				DTC(:,:,41) = DTWCDOP2
-				DTC(:,:,42) = DTWNCDOP2
-				DTC(:,:,43) = DTWCDOP3
-				DTC(:,:,44) = DTWNCDOP3
+!	       CALL DOP 
+!		   
+!		    DTC(:,:,21) = DTWCDOP1
+!				DTC(:,:,22) = DTWNCDOP1
+!				DTC(:,:,41) = DTWCDOP2
+!				DTC(:,:,42) = DTWNCDOP2
+!				DTC(:,:,43) = DTWCDOP3
+!				DTC(:,:,44) = DTWNCDOP3
 				
-	   ENDIF
+!	     ENDIF
 	   
 	   
-       IF (COD_CALC)         CALL CODMND(DTC(0,1,26))
+         IF (COD_CALC)         CALL CODMND(DTC(0,1,26))
 	   
-       IF (OXYGEN_CALC)      CALL OXYGEN(DTC(0,1,27))
-       IF (SILICA_CALC)      CALL SILICA(DTC(0,1,28),DTC(0,1,29),FLUXS(0,1,10))
+         IF (OXYGEN_CALC)      CALL OXYGEN(DTC(0,1,27))
+        IF (SILICA_CALC)      CALL SILICA(DTC(0,1,28),DTC(0,1,29),FLUXS(0,1,10))
 
-       SFENT = -9999
-       IF (SFEEDER) THEN
-         DO I=1,NSPECIES
-           CALL SUSPFEED(I,DTC(0,1,4), DTC(0,1,5), DTC(0,1,6), DTC(0,1,30), &
-                         DTC(0,1,31),DTC(0,1,32),DTC(0,1,11),DTC(0,1,23), &
-                         DTC(0,1,18),DTC(0,1,12),DTC(0,1,24),DTC(0,1,19), &
-                         DTC(0,1,3), DTC(0,1,28),DTC(0,1,29),DTC(0,1,20))
-         ENDDO
-       ENDIF
+      !  SFENT = -9999
+      !  IF (SFEEDER) THEN
+      !    DO I=1,NSPECIES
+      !      CALL SUSPFEED(I,DTC(0,1,4), DTC(0,1,5), DTC(0,1,6), DTC(0,1,30), &
+      !                    DTC(0,1,31),DTC(0,1,32),DTC(0,1,11),DTC(0,1,23), &
+      !                    DTC(0,1,18),DTC(0,1,12),DTC(0,1,24),DTC(0,1,19), &
+      !                    DTC(0,1,3), DTC(0,1,28),DTC(0,1,29),DTC(0,1,20))
+      !    ENDDO
+      !  ENDIF
 	
 
 !     *** Convert water column change in concentration to change in mass
 !
-       DO JCON=1,NAC
-        II=AC(JCON)
+      ! DO JCON=1,NAC
+      !  II=AC(JCON)
 	!	write(*,*)'II = ',II
-        DO K=1,KBM1
-          DO I=1,MLOC
-           DTM(I,K,II) = DTC(I,K,II)       !*V1(I,K)
-          ENDDO  
-        ENDDO
-       ENDDO  
+       ! DO K=1,KBM1
+        !  DO I=1,MLOC
+         ! DTM(I,K,II) = DTC(I,K,II)       !*V1(I,K)
+            DTM= DTC    !*V1(I,K)
+
+         ! ENDDO  
+       ! ENDDO
+      ! ENDDO  
 
       ENDIF
 
@@ -2837,40 +2864,12 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 		WRITE(*,'(A24,I5.0,A3,EN15.3,A20)')"Total time used in part ",NPROFILE," = ",TOTAL_TIME_PROFILE," VISCOFH"
 	 ENDIF
 
-!!RGL commented out below as DOS only needed locally for CONLIT (not used)
-!RGL changed below to be T instead of TE (per Genet 1974)
-!     DO K=1,KBM1
-!       DO I=1,MLOC
-!         CONLIT(I,K,1) = T(I,K)
-!         DOS = 14.5532+T(I,K)*(0.0054258*T(I,K)-0.38217)         
-!         CONLIT(I,K,27) = DOS
-!       ENDDO  
-!     ENDDO
-!
-!     DO JCON=1,NAC
-!       II=AC(JCON)
-!       DO K=1,KBM1 
-!         DO I=1,MLOC
-!           DTM(I,K,II) = DTM(I,K,II)+(QLIT(I,K)*CONLIT(I,K,II))
-!! RGL need to print Qlit - what is it for?
-!!         IF(I.eq.1000) WRITE(*,*)'QLIT', QLIT(I,K)
-!         ENDDO
-!       ENDDO
-!     ENDDO           
-
-!RGL uncommented VERTVL below for full PS run
-!     CALL VERTVL
 
 	 IF(MSR)THEN
 		TOTAL_TIME_PROFILE=DTIME(ELAPSED_PROFILE)
 		NPROFILE=NPROFILE+1
 	 ENDIF
-	 
-    
-	
-        !IF(MSR)write(*,*)'LBnote 1: size(C2,1)=',SIZE(C2,1)
-        !IF(MSR)write(*,*)'LBnote 1: size(C2,2)=',SIZE(C2,2)
-        !IF(MSR)write(*,*)'LBnote 1: size(C2,3)=',SIZE(C2,3)
+
      CALL EXCHANGE_WQM(C2)
 	 
 	  IF(MSR)THEN
@@ -2883,9 +2882,6 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 		NPROFILE=NPROFILE+1
 	 ENDIF
 	 
-        !IF(MSR)write(*,*)'LBnote 2: size(C2,1)=',SIZE(C2,1)
-        !IF(MSR)write(*,*)'LBnote 2: size(C2,2)=',SIZE(C2,2)
-        !IF(MSR)write(*,*)'LBnote 2: size(C2,3)=',SIZE(C2,3)
 	 
 	 CALL DENS2 ! Added by B Clark to calculate density in the model, June 2018
 	 
@@ -2902,20 +2898,12 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 		NPROFILE=NPROFILE+1
 	 ENDIF
 	 
-  !   CALL FCT_NUT
-	 ! IF(MSR)THEN
-	!	TOTAL_TIME_PROFILE=TOTAL_TIME_PROFILE+DTIME(ELAPSED_PROFILE)
-	!	WRITE(*,'(A24,I5.0,A3,EN15.3,A20)')"Total time used in part ",NPROFILE," = ",TOTAL_TIME_PROFILE," FCTNUT"
-	 !ENDIF
-	 
+
 	 IF(MSR)THEN
 		TOTAL_TIME_PROFILE=DTIME(ELAPSED_PROFILE)
 		NPROFILE=NPROFILE+1
 	 ENDIF
-	 
-        !IF(MSR)write(*,*)'LBnote 3: size(C2F,1)=',SIZE(C2F,1)
-        !IF(MSR)write(*,*)'LBnote 3: size(C2F,2)=',SIZE(C2F,2)
-        !IF(MSR)write(*,*)'LBnote 3: size(C2F,3)=',SIZE(C2F,3)
+
      CALL VDIF_WQM(C2F)
 	  IF(MSR)THEN
 		TOTAL_TIME_PROFILE=TOTAL_TIME_PROFILE+DTIME(ELAPSED_PROFILE)
@@ -2966,27 +2954,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
                                     !just updated water column (end of first time step)
                                     !(this is becaluse excel version uses water column temperature AND DO NOT REALLY
                                     !HAVE INITIAL TEMPERATURE, EXCEL VERSION DOESN NOT HAVE A TEMPERATURE EQUATION)
-            
-            !OR SIMPLY USE the following line
-            ! CTEMP=T(:,KBM1)
 
-
-!                IF(PAR)THEN
-!#if defined (MULTIPROCESSOR)                
-!                    DO I=1,MLOC
-
-			!                        IF(NGID(I)==38)THEN  !global node number of a local I
-!                            WRITE(*,*)'CTEMP(38)=, MYID=',CTEMP(I), MYID
-!                            !
-!                        ENDIF
-!                    ENDDO
-!#endif                    
-!                ELSE
-!                    IF(MLOC>=38)THEN
-!                        WRITE(*,*)'CTEMP(38)=',CTEMP(38)
-!                        !
-!                    ENDIF
-!                ENDIF
 
             CALL POM_ACCUMUL
             
@@ -3091,9 +3059,9 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
             ENDIF                                                                               
  !       write(*,*)'About to call SED model'
             IF(STEADY_STATE_SED_TS)THEN    
-                CALL SED_CALC(.TRUE.)  !quasi-steady state calculation 
+               CALL SED_CALC(.TRUE.)  !quasi-steady state calculation 
             ELSE
-                CALL SED_CALC(.FALSE.) !FALSE means use time-varying calculation
+               CALL SED_CALC(.FALSE.) !FALSE means use time-varying calculation
             ENDIF
             
             !set accumulative fluxes back to zero
@@ -3159,240 +3127,110 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
        FNDLT = DLTFTN(DLTDP)
      ENDIF
 
-!******* Mass balance
-
-     IF (MASS_BALANCE) THEN
-!
-!       *** Water column constituent mass
-!
-        DO JCON=1,NAC
-          II=AC(JCON)
-          CMASS(II) = 0.0
-          DO K=1,KBM1
-            DO I=1,MLOC
-              CMASS(II) = CMASS(II)+C1(I,K,II)*ART1(I)*D(I)*DZ(K)*0.001  !the 0.001 here is to convert to kg
-            ENDDO  
-          ENDDO
-        ENDDO  
-
-!********* Water column nutrient mass
-
-        WCMN = ANC1*CMASS(4)+ANC2*CMASS(5)+ANC3*CMASS(6)            &
-               +ANCSZ*CMASS(7)+ANCLZ*CMASS(8)                       &
-               +CMASS(13)+CMASS(14)+CMASS(15)+CMASS(16)             &
-               +CMASS(17)+CMASS(18)+CMASS(19)
-        WCMP = APCSZ*CMASS(7)+APCLZ*CMASS(8)                        &
-               +CMASS(20)+CMASS(21)+CMASS(22)+CMASS(23)             &
-               +CMASS(24)+CMASS(25)+CMASS(30)+CMASS(31)             &
-               +CMASS(32)
-        WCMC = CMASS(4)+CMASS(5)+CMASS(6)+CMASS(7)+CMASS(8)         &
-               +CMASS(9)+CMASS(10)+CMASS(11)+CMASS(12)
-        WCMS = ASC1*CMASS(4)+ASC2*CMASS(5)+ASC3*CMASS(6)            &
-               +CMASS(28)+CMASS(29)
-
-!********* Change in water column nutrient mass
-          
-        DLWCMN = WCMN-IWCMN
-        DLWCMP = WCMP-IWCMP
-        DLWCMC = WCMC-IWCMC
-
-!********* Atmospheric loadings during DLT time 
-
-       ATMFLXN = ATMFLXN+(ATMNH4+ATMNO3+ATMLDON+ATMRDON)            &
-                 *PRECIP*SFATOT/1000.*DLT
-                !unit is (gN/m^3)* (m/sec) * (m^2)/1000 * (sec)
-                !==> gN/sec*sec/1000 ==kgN
-       ATMFLXP = ATMFLXP+(ATMPO4+ATMLDOP+ATMRDOP)                   &
-                 *PRECIP*SFATOT/1000.*DLT
-       TM1=.001*DLT*PRECIP
-
-       DO SB=1,MLOC
-         ATMFLXNB(SB) = ATMFLXNB(SB)+                               &
-           (ATMNH4+ATMNO3+ATMLDON+ATMRDON)*ART1(SB)*TM1
-
-             !unit of ATMFLXNB here is:
-             !   gN/m^3 * (m^2) * (sec) * (m/sec) /1000
-             !== gN/1000 = kgN
-
-         ATMFLXPB(SB) = ATMFLXPB(SB)+                               &
-           (ATMPO4+ATMLDOP+ATMRDOP)*ART1(SB)*TM1
-       ENDDO
-!
-!       *** Benthic transfers
-!
-       TM1=DLT/86400000.
-       DO BB=1,MLOC
-
-         TM2 = PNFWS(BB)*ART1(BB)*TM1  ! unit 
-         !unit of TM2 is (gN/m^2/day)* (m^2) * (sec)/86400 /1000
-         ! ==>  gN /day * day /1000 = kgN in DLT (sec) time)
-
-         BENFLXPN      = BENFLXPN      + TM2 
-         BENFLXPNB(BB) = BENFLXPNB(BB) + TM2
-
-         TM2 = (BENNH4(BB)+BENNO3(BB))*ART1(BB)*TM1
-         !unit of TM2 is (gN/m^2/day)*(m^2)* (sec)/86400/1000 = kgN  
-         BENFLXDN      = BENFLXDN      + TM2
-         BENFLXDNB(BB) = BENFLXDNB(BB) + TM2
-
-         TM2 = PPFWS(BB)*ART1(BB)*TM1
-         BENFLXPP      = BENFLXPP      + TM2
-         BENFLXPPB(BB) = BENFLXPPB(BB) + TM2
-
-         TM2 = BENPO4(BB)*ART1(BB)*TM1
-         BENFLXDP      = BENFLXDP      + TM2
-         BENFLXDPB(BB) = BENFLXDPB(BB) + TM2
-
-         TM2 = PCFWS(BB)*ART1(BB)*TM1
-         BENFLXPC      = BENFLXPC      + TM2
-         BENFLXPCB(BB) = BENFLXPCB(BB) + TM2
-       ENDDO
-!
-!       *** Change in nutrient mass due to kinetics
-!
-       TM1=ANDC*DLT/86400000.
-       TM2=DLT/86400000.
-       DO K=1,KBM1
-         DO I=1,MLOC
-           DTMP1 = DENIT(I,K)*ART1(I)*D(I)*DZ(K)*TM1
-           DLWCKMNB(I,K) = DLWCKMNB(I,K)-DTMP1
-           DLWCKMN = DLWCKMN-DTMP1
-           !WLong: need to check DENIT and DDLALGC etc units to make sure
-           !consistent
-           DTMP1 = (DLALGC(I,K)-RESPC(I,K)-MNLDOC(I,K)-DENIT(I,K))   &   !-MNLRDOC(I,K) B Clarked chagned to 1 term MNLDOC
-                   *ART1(I)*D(I)*DZ(K)*TM2
-           DLWCKMCB(I,K) = DLWCKMCB(I,K)+DTMP1
-           DLWCKMC = DLWCKMC+DTMP1
-         ENDDO  
-       ENDDO  
-!
-!       *** Boundary fluxes
-!
-       DO JCB=1,INFLOW
-         F=IFLOWP(JCB)
-         BNDN = FLXTNH4(F)+FLXTNO3(F)+FLXTLDON(F)+FLXTRDON(F)         &
-                +FLXTLPON(F)                                          &
-                +FLXTRPON(F)+ANC1*FLXT1(F)+ANC2*FLXT2(F)+ANC3         &
-                *FLXT3(F)+ANCSZ*FLXTSZ(F)+ANCLZ*FLXTLZ(F)
-         BNDP = FLXTPO4(F)+FLXTLDOP(F)+FLXTRDOP(F)+FLXTLPOP(F)        &
-                +FLXTRPOP(F)                                          &
-                +APCSZ*FLXTSZ(F)+APCLZ*FLXTLZ(F)                      &
-                +FLXTPIB1(F)+FLXTPIB2(F)+FLXTPIB3(F)
-         BNDC = FLXTLDOC(F)+FLXTRDOC(F)+FLXTLPOC(F)+FLXTRPOC(F)       &
-                +FLXT1(F)+FLXT2(F)+FLXT3(F)+FLXTSZ(F)+FLXTLZ(F)
-         IF (LEFT_FLOWB(F)) THEN
-           BNDFLXN = BNDFLXN+BNDN
-           BNDFLXP = BNDFLXP+BNDP
-           BNDFLXC = BNDFLXC+BNDC
-         ELSE
-           BNDFLXN = BNDFLXN-BNDN
-           BNDFLXP = BNDFLXP-BNDP
-           BNDFLXC = BNDFLXC-BNDC
-         ENDIF
-       ENDDO
-!
-!       *** Water column mass balance % error
-!
-       DLWCSSMN = BNDFLXN+BENFLXPN+BENFLXDN+S1FLXN+S2FLXN+S3FLXN      &
-                  +ATMFLXN+DLWCKMN
-       DLWCSSMP = BNDFLXP+BENFLXPP+BENFLXDP+S1FLXP+S2FLXP+S3FLXP      &
-                  +ATMFLXP
-       DLWCSSMC = BNDFLXC+BENFLXPC+S1FLXC+S2FLXC+S3FLXC+DLWCKMC
-          
-       ERRWCN   = 0.0
-       ERRWCP   = 0.0
-       ERRWCC   = 0.0
-       IF(DLWCMN /= 0.0) ERRWCN = (DLWCMN-DLWCSSMN)/DLWCMN*100.
-       IF(DLWCMP /= 0.0) ERRWCP = (DLWCMP-DLWCSSMP)/DLWCMP*100.
-       IF(DLWCMC /= 0.0) ERRWCC = (DLWCMC-DLWCSSMC)/DLWCMC*100.
-!
-!       *** Change in sediment concentration due to burial and kinetics
-!
-       DTMP1=DLTS/1.E6
-       DTMP2=DLTS/1.E3
-       DO BB=1,MLOC
-
-         DFTMP=DTMP1*ART1(BB) !
-         
-         BURIALFLXCB(BB) = BURIALFLXCB(BB)-BURIALC(BB)*DFTMP    !kgC         
-         BURIALFLXNB(BB) = BURIALFLXNB(BB)-BURIALN(BB)*DFTMP    !(mgN/m^2/d) * d  * m^2 /1000/1000 mgN/1000/1000= gN/1000=kgN
-         BURIALFLXPB(BB) = BURIALFLXPB(BB)-BURIALP(BB)*DFTMP    !kgP
-
-         BURIALFLXC      = BURIALFLXC-BURIALC(BB)*DFTMP    !kgC
-         BURIALFLXN      = BURIALFLXN-BURIALN(BB)*DFTMP    !kgN
-         BURIALFLXP      = BURIALFLXP-BURIALP(BB)*DFTMP    !kgP
-         
-
-         DFTMP=DTMP2*ART1(BB)
-         
-         DLSEDKCB(BB)    = DLSEDKCB(BB)-DIAGENC(BB)*DFTMP    !kgC
-         DLSEDKNB(BB)    = DLSEDKNB(BB)-BENDEN(BB)*DFTMP    !kgN
-         !Unit of DLSEDKN  is BENDEN * DTMP2* ART1
-         ! ==> BENDEN *  (day/1000) * m^2
-         ! ==> where  BENDEN(I)  =
-         !                         (XAPP1NO3*XAPP1NO3*NO31/S+XK2NO3*NO32)/1000. 
-         !     has unit (m/day) * (mgN/m^3) /1000 == gN/m^2/day
-         ! ==> DLSEDKN has unit  (gN/m^2/day) *(day) * m^2/1000 == kgN 
-         
-         DLSEDKC         = DLSEDKC-DIAGENC(BB)*DFTMP    !kgC
-         DLSEDKN         = DLSEDKN-BENDEN(BB)*DFTMP        !kgN
-         
-       ENDDO
-
-!********* Sediment mass balance change in DLTS time time
-
-       DLSEDMN   = SEDMN-ISEDMN
-       DLSEDMP   = SEDMP-ISEDMP
-       DLSEDMC   = SEDMC-ISEDMC
-       
-       DLSEDSSMN = BURIALFLXN+DLSEDKN-BENFLXPN-BENFLXDN
-       DLSEDSSMP = BURIALFLXP-BENFLXPP-BENFLXDP
-       DLSEDSSMC = BURIALFLXC+DLSEDKC-BENFLXPC
-!
-!         *** Sediment mass balance % error
-!
-       IF(SEDIMENT_CALC) THEN 
-         ERRSEDN = 0.0
-         ERRSEDP = 0.0
-         ERRSEDC = 0.0
-         IF(DLSEDMN /= 0.0) ERRSEDN = (DLSEDMN-DLSEDSSMN)/DLSEDMN*100.
-         IF(DLSEDMP /= 0.0) ERRSEDP = (DLSEDMP-DLSEDSSMP)/DLSEDMP*100.
-         IF(DLSEDMC /= 0.0) ERRSEDC = (DLSEDMC-DLSEDSSMC)/DLSEDMC*100.
-       ENDIF
-     ENDIF   !END MASS_BALANCE
-    
-!
-!    *** Oxygen days
-!
-!   KURT GLAESEMANN - ONLY MSR plots
-# if defined (KILLTREES)
-     IF (OXYGEN_PLOTS .AND. MSR) THEN
-       TM1=DLT/86400.
-       DO J=1,NOINT-1
-         DO K=1,KBM1
-           DO I=1,MLOC
-             IF (DOXG(I,K) >= OINT(J) .AND. DOXG(I,K) < OINT(J+1)) THEN
-               DOVDAYS(I,K,J) = DOVDAYS(I,K,J)+TM1*ART1(I)*D(I)*DZ(K)
-             ENDIF
-           ENDDO  
-         ENDDO
-       ENDDO    
-       DO K=1,KBM1
-         DO I=1,MLOC
-           IF(DOXG(I,K) >= OINT(NOINT))                          &
-              DOVDAYS(I,K,J)=DOVDAYS(I,K,J)+TM1*ART1(I)*D(I)*DZ(K)
-         ENDDO  
-       ENDDO  
-     ENDIF
-# endif
-
 ! KURT GLAESEMANN, use local number of elements
 !    DO I=1,NGL
      DO I=1,NTLOC
        DT1(I)=DT(NV(I,1))+DT(NV(I,2))+DT(NV(I,3))
        DT1(I)=DT1(I)/3.0
      ENDDO
+ 	 
+	 IF(MSR)THEN
+		TOTAL_TIME_PROFILE=TOTAL_TIME_PROFILE+DTIME(ELAPSED_PROFILE)
+		WRITE(*,'(A24,I5.0,A3,EN15.3,A20)')"Total time used in part ",NPROFILE," = ",TOTAL_TIME_PROFILE," KILLTREES1"
+	 ENDIF	 
 
+
+
+	 ! Add in Budget variables here and will output at the very end by changing
+	 ! the output frequency to the length of the model run
+  
+#if defined (BUDGET)	  
+	  !this is all in grams m^-3 timestep^-1, so need to multiply by the layer and nodal volume
+	  !!get the volume
+	  DO I = 1,MLOC
+	
+	  !Integrate sediment nutrogen fluxes in time and space
+	  !in addition to the settling flux of POM from the overlying water column
+	  
+	   JNH4_out(I)=JNH4_out(I)+JNH4TM1S(I)*ART1(I)/86400*DLT/1E6   !kg N per nodal area
+		 JNO3_out(I)=JNO3_out(I)+JNO3TM1S(I)*ART1(I)/86400*DLT/1E6		 !kg N per nodal area
+		 JPOC_out(I,:)=JPOC_out(I,:)+JPOC(I,:)*ART1(I)/86400*DLT/1E6     !kg C per node
+		 JPON_out(I,:)=JPON_out(I,:)+JPON(I,:)*ART1(I)/86400*DLT/1E6	 !kg N per node
+		 !JPOP_out(I,:)=JPOP_out(I,:)+JPOP(I,:)*ART1(I)/86400*DLT/1E6	 !kg P per node
+		 
+	  DO K=1,KBM1
+					 
+	  MyVolume=(D(I)*DZ(K)*ART1(I))
+								
+	  ALGDON_OUT(I,K)=ALGDON_OUT(I,K)+ALGDON(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  ALGPON_OUT(I,K)=ALGPON_OUT(I,K)+ALGPON(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  ALGNH4_OUT(I,K)=ALGNH4_OUT(I,K)+ALGNH4(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  ALGNO3_OUT(I,K)=ALGNO3_OUT(I,K)+ALGNO3(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  DENNO3_OUT(I,K)=DENNO3_OUT(I,K)+DENNO3(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  NT_OUT(I,K)=NT_OUT(I,K)+NT(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  DENITN_OUT(I,K)=DENITN_OUT(I,K)+DENITN(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  HDRLPON_OUT(I,K)=HDRLPON_OUT(I,K)+HDRLPON(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  HDRRPON_OUT(I,K)=HDRRPON_OUT(I,K)+HDRRPON(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  COAGN_OUT(I,K)=COAGN_OUT(I,K)+COAGN(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  MNLDON1_OUT(I,K)=MNLDON1_OUT(I,K)+MNLDON1(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  MNLDON2_OUT(I,K)=MNLDON2_OUT(I,K)+MNLDON2(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  MNLDON3_OUT(I,K)=MNLDON3_OUT(I,K)+MNLDON3(I,K)/86400*DLT*MyVolume/1E3 !kg N per node per depth
+	  	  
+	  ALGDOC_OUT(I,K)=ALGDOC_OUT(I,K)+ALGDOC(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  ALGPOC_OUT(I,K)=ALGPOC_OUT(I,K)+ALGPOC(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  DENIT_OUT(I,K)=DENIT_OUT(I,K)+DENIT(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  HDRLPOC_OUT(I,K)=HDRLPOC_OUT(I,K)+HDRLPOC(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  HDRRPOC_OUT(I,K)=HDRRPOC_OUT(I,K)+HDRRPOC(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  COAGC_OUT(I,K)=COAGC_OUT(I,K)+COAGC(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  
+	  MNLDOC1_OUT(I,K)=MNLDOC1_OUT(I,K)+MNLDOC1(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  MNLDOC2_OUT(I,K)=MNLDOC2_OUT(I,K)+MNLDOC2(I,K)/86400*DLT*MyVolume/1E3 !kg C per node per depth
+	  MNLDOC3_OUT(I,K)=MNLDOC3_OUT(I,K)+MNLDOC3(I,K)/86400*DLT*MyVolume /1E3 !kg C per node per depth	 
+	  
+	  
+	  PHOTOCHEM_DOC_ACCUM_OUT(I,K,:)=PHOTOCHEM_DOC_ACCUM_OUT(I,K,:)+PHOTOCHEM_DOC_ACCUM(I,K,:)/86400*DLT*MyVolume/1E3!kg C per node per depth	
+	  	  
+	  !! Below will be for calculating the change in concentration over time, with advection
+	  !! C2 is the updated concentration after advection, the old one is from the previous time step
+	  
+	  !Delta DOC
+	       DTWCDOC1_out(I,K)=DTWCDOC1_out(I,K)+(C2(I,K,9)*MyVolume-WC_CDOC1(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+	       DTWCDOC2_out(I,K)=DTWCDOC2_out(I,K)+(C2(I,K,33)*MyVolume-WC_CDOC2(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+		     DTWCDOC3_out(I,K)=DTWCDOC3_out(I,K)+(C2(I,K,35)*MyVolume-WC_CDOC3(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+		   
+	       DTWNCDOC1_out(I,K)=DTWNCDOC1_out(I,K)+(C2(I,K,10)*MyVolume-WC_NCDOC1(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+	       DTWNCDOC2_out(I,K)=DTWNCDOC2_out(I,K)+(C2(I,K,34)*MyVolume-WC_NCDOC2(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+		     DTWNCDOC3_out(I,K)=DTWNCDOC3_out(I,K)+(C2(I,K,36)*MyVolume-WC_NCDOC3(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+	  !Delta DON
+		     DTWCDON1_out(I,K)=DTWCDON1_out(I,K)+(C2(I,K,16)*MyVolume-WC_CDON1(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+	       DTWCDON2_out(I,K)=DTWCDON2_out(I,K)+(C2(I,K,37)*MyVolume-WC_CDON2(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		     DTWCDON3_out(I,K)=DTWCDON3_out(I,K)+(C2(I,K,39)*MyVolume-WC_CDON3(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		   
+	       DTWNCDON1_out(I,K)=DTWNCDON1_out(I,K)+(C2(I,K,17)*MyVolume-WC_NCDON1(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+	       DTWNCDON2_out(I,K)=DTWNCDON2_out(I,K)+(C2(I,K,38)*MyVolume-WC_NCDON2(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		     DTWNCDON3_out(I,K)=DTWNCDON3_out(I,K)+(C2(I,K,40)*MyVolume-WC_NCDON3(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		   
+	   !Delta POC
+		     DTLPOC_out(I,K)=DTLPOC_out(I,K)+(C2(I,K,11)*MyVolume-LPOC(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+		     DTRPOC_out(I,K)=DTRPOC_out(I,K)+(C2(I,K,12)*MyVolume-RPOC(I,K)*MyVolumeTM1(I,K))/1E3!kg C per node per depth	
+
+	   !Delta PON
+		     DTLPON_out(I,K)=DTLPON_out(I,K)+(C2(I,K,18)*MyVolume-LPON(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		     DTRPON_out(I,K)=DTRPON_out(I,K)+(C2(I,K,19)*MyVolume-RPON(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		   
+	   !Delta NH4
+		     DTNH4_out(I,K)=DTNH4_out(I,K)+(C2(I,K,13)*MyVolume-NH4(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		   
+	   !Delta NO3
+		     DTNO3_out(I,K)=DTNO3_out(I,K)+(C2(I,K,14)*MyVolume-NO3(I,K)*MyVolumeTM1(I,K))/1E3!kg N per node per depth	
+		   
+		     MyVolumeTM1(I,K)=MyVolume
+	     enddo
+	  enddo	
+	  
+#endif	  
+	    
+	  
 !RGL commented below
 ! T(:,:)    = C2(:,:,1)
 !   SALT(:,:) = C2(:,:,2)
@@ -3404,7 +3242,9 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    LZ(:,:)   = C2(:,:,8)
    
    WC_CDOC1(:,:) = C2(:,:,9)
-   WC_NCDOC1(:,:) = C2(:,:,10)
+   WC_NCDOC1(:,:) = C2(:,:,10)  
+
+
    !LDOC(:,:) = C2(:,:,9)
    !RDOC(:,:) = C2(:,:,10)
    LPOC(:,:) = C2(:,:,11)
@@ -3438,8 +3278,11 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    
    WC_CDOC2(:,:) = C2(:,:,33)
    WC_NCDOC2(:,:) = C2(:,:,34)
+
    WC_CDOC3(:,:) = C2(:,:,35)
    WC_NCDOC3(:,:) = C2(:,:,36)
+
+
    WC_CDON2(:,:) = C2(:,:,37)
    WC_NCDON2(:,:) = C2(:,:,38)
    WC_CDON3(:,:) = C2(:,:,39)
@@ -3448,64 +3291,37 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
    WC_NCDOP2(:,:) = C2(:,:,42)
    WC_CDOP3(:,:) = C2(:,:,43)
    WC_NCDOP3(:,:) = C2(:,:,44)
-   
-   
- 	 
-	 IF(MSR)THEN
-		TOTAL_TIME_PROFILE=TOTAL_TIME_PROFILE+DTIME(ELAPSED_PROFILE)
-		WRITE(*,'(A24,I5.0,A3,EN15.3,A20)')"Total time used in part ",NPROFILE," = ",TOTAL_TIME_PROFILE," KILLTREES1"
-	 ENDIF	 
-	 
-	 
+     
 	 IF(MSR)THEN
 		TOTAL_TIME_PROFILE=DTIME(ELAPSED_PROFILE)
 		NPROFILE=NPROFILE+1
 	 ENDIF
-	 
+   
+#if defined(XFLUX_FLAG)   
+! write(*,*)' Calcuating the XFLUX out'
+!Added by B Clark to time integrate xflux for each WQ var
+   EDGELINE_FLUX_IN=EDGELINE_FLUX_in+EDGELINE_FLUX
+! write(*,*)'Done Calcuating the XFLUX out'
+#endif
+
 	 !set up loop to output the netcdf at the correct interval
 	 IF(CDF_OUT) THEN
+	     IF(JDAY >= CDF_START .AND. JDAY <= CDF_END)THEN
 	   CDF_COUNTER=CDF_COUNTER+DLT
 	      IF(CDF_COUNTER .EQ. CDF_INT) THEN
 		  !write(*,*)'NPP = ',total_netPP(1)
              CALL OUT_NETCDF
-			 write(*,*)'Wrote NETCDF'
+            !  write(*,*)'Wrote NETCDF'
+#if defined(XFLUX_FLAG)             
+             CALL WRITE_EDGELINE_FLUX
+             EDGELINE_FLUX_IN=0.
+#endif             
+	!		 write(*,*)'Wrote NETCDF'
 			 CDF_COUNTER = 0.
 		  ENDIF
-	  ENDIF
-				  
-	 ! Add in Budget variables here and will output at the very end by changing
-	 ! the output frequency to the length of the model run
+	    ENDIF
+	  ENDIF	  
 	  
-#if defined (BUDGET)
-	  
-	  ALGDON_OUT=ALGDON_OUT+ALGDON/86400*DLT
-	  ALGPON_OUT=ALGPON_OUT+ALGPON/86400*DLT
-	  ALGNH4_OUT=ALGNH4_OUT+ALGNH4/86400*DLT
-	  ALGNO3_OUT=ALGNO3_OUT+ALGNO3/86400*DLT
-	  DENNO3_OUT=DENNO3_OUT+DENNO3/86400*DLT
-	  NT_OUT=NT_OUT+NT/86400*DLT
-	  DENITN_OUT=DENITN_OUT+DENITN/86400*DLT
-	  HDRLPON_OUT=HDRLPON_OUT+HDRLPON/86400*DLT
-	  HDRRPON_OUT=HDRRPON_OUT+HDRRPON/86400*DLT
-	  COAGN_OUT=COAGN_OUT+COAGN/86400*DLT
-	  MNLDON1_OUT=MNLDON1_OUT+MNLDON1/86400*DLT
-	  MNLDON2_OUT=MNLDON2_OUT+MNLDON2/86400*DLT
-	  MNLDON3_OUT=MNLDON3_OUT+MNLDON3/86400*DLT
-	  	  
-	  ALGDOC_OUT=ALGDOC_OUT+ALGDOC/86400*DLT
-	  ALGPOC_OUT=ALGPOC_OUT+ALGPOC/86400*DLT
-	  DENIT_OUT=DENIT_OUT+DENIT/86400*DLT
-	  HDRLPOC_OUT=HDRLPOC_OUT+HDRLPOC/86400*DLT
-	  HDRRPOC_OUT=HDRRPOC_OUT+HDRRPOC/86400*DLT
-	  COAGC_OUT=COAGC_OUT+COAGC/86400*DLT
-	  MNLDOC1_OUT=MNLDOC1_OUT+MNLDOC1/86400*DLT
-	  MNLDOC2_OUT=MNLDOC2_OUT+MNLDOC2/86400*DLT
-	  MNLDOC3_OUT=MNLDOC3_OUT+MNLDOC3/86400*DLT	 	  
-	  PHOTOCHEM_DOC_ACCUM_OUT=PHOTOCHEM_DOC_ACCUM_OUT+PHOTOCHEM_DOC_ACCUM/86400*DLT
-	  	  
-#endif	  
-	  
-
     CALL  WQM_OUTPUT(NTHIS_OLD, NTSTN_OLD, NTHIS,NTSTN,CTR_HIS,CTR_STN)
 	
 	!IF(SED_DOM) THEN! B Clark output sediment DOM variables
@@ -3530,762 +3346,6 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 		NPROFILE=NPROFILE+1
 	 ENDIF
 
-!    KURT GLAESEMANN - only MSR does printout
-# if defined (KILLTREES)
-     IF (SNAPSHOTS .AND. MSR) THEN
-       IF (JDAY >= NXSNP .OR. JDAY >= SNPD(SNPDP+1)) THEN
-         IF (JDAY >= SNPD(SNPDP+1)) THEN
-           SNPDP = SNPDP+1
-           NXSNP = SNPD(SNPDP)
-         ENDIF
-         NXSNP = NXSNP+SNPF(SNPDP)
-         WRITE (SNP,3000)
-         WRITE (SNP,3010) (TITLE(K),K=1,6)
-         WRITE (SNP,3020) JDAY,INT(ELTMJD),(ELTMJD-INT(ELTMJD))*24.,  &
-                          NIT,DLT,DLTAV
-         DO JCON=1,NAC
-           WRITE (SNP,3030) CNAME(AC(JCON)),((C1(I,K,AC(JCON)),I=1,MLOC),K=1,KBM1)
-         ENDDO  
-         
-         !The following should be moved to sediment module for clarity
-         IF (SEDIMENT_CALC) THEN
-           WRITE (SNP,3034) SSNAME(1),(CTEMP(BB),BB=1,MLOC)
-           DO JG=1,3
-             WRITE (SNP,3035) JG,SSNAME(2),(CPOP(BB,JG),BB=1,MLOC)
-             WRITE (SNP,3035) JG,SSNAME(3),(CPON(BB,JG),BB=1,MLOC)
-             WRITE (SNP,3035) JG,SSNAME(4),(CPOC(BB,JG),BB=1,MLOC)
-           ENDDO                
-           WRITE (SNP,3034) SSNAME(5), (CPOS(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(6), (PO4T2TM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(7), (NH4T2TM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(8), (NO3T2TM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(9), (HST2TM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(10),(CH4T2TM1S(BB),BB=1,MLOC) 
-           WRITE (SNP,3034) SSNAME(11),(CH41TM1S(BB),BB=1,MLOC) 
-           WRITE (SNP,3034) SSNAME(12),(SO4T2TM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(13),(SIT2TM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(14),(BENSTRTM1S(BB),BB=1,MLOC)
-           WRITE (SNP,3034) SSNAME(15),(BBM(BB),BB=1,MLOC) 
-         ENDIF
-         
-         IF (DFEEDER)                                             & 
-            WRITE (SNP,3034) SSNAME(16),(DFEEDM1S(BB),BB=1,MLOC)
-            
-         IF (SFEEDER) THEN
-           DO N=1,NSPECIES 
-             WRITE (SNP,3036) N,SSNAME(17),(SFEED(BB,N),BB=1,MLOC) 
-           ENDDO
-         ENDIF
-
-         IF (BENTHIC_FLUXES.AND.BENTHIC_OUTPUT) THEN
-           WRITE (BFO,3020) JDAY,INT(ELTMJD),                        &
-               (ELTMJD-INT(ELTMJD))*24.,NIT,DLT,DLTAV
-           WRITE (BFO,3034) 'DOC Flux', (BENDOC(BB), BB=1,MLOC) !WLong: need to use global array
-           WRITE (BFO,3034) 'Ammonium Flux', (BENNH4(BB),BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'Nitrate Flux', (BENNO3(BB),BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'Phosphate Flux', (BENPO4(BB),BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'COD Flux', (BENCOD(BB), BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'CH4 Gas Flux', (BENCH4G(BB), BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'CH4 Aq Flux', (BENCH4A(BB), BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'SOD', (BENDO(BB),BB=1,MLOC)    !WLong: need to use global array
-           WRITE (BFO,3034) 'Silica Flux', (BENSA(BB), BB=1,MLOC)    !WLong: need to use global array
-         ENDIF
-
-       ENDIF
-     ENDIF
-
-!******* Plots
-
-! KURT GLAESEMANN - only MSR writes to plot files
-     IF (PLOTS .AND. MSR) THEN
-       IF (JDAY >= NXPLT .OR. JDAY >= PLTD(PLTDP+1)) THEN
-         IF (JDAY >= PLTD(PLTDP+1)) THEN
-           PLTDP = PLTDP+1
-           NXPLT = PLTD(PLTDP)
-         ENDIF
-         NXPLT = NXPLT+PLTF(PLTDP)
-         WRITE (PLT,*) JDAY,(((C2(I,K,AC(JCON)),I=1,MLOC),K=1,KBM1),JCON=1,NAC)
-         WRITE (PLT,*) ((CCHL1(I,K),I=1,MLOC),K=1,KBM1),                       &
-                     ((CCHL2(I,K),I=1,MLOC),K=1,KBM1),                       &
-                     ((CCHL3(I,K),I=1,MLOC),K=1,KBM1)
-
-         IF (QUALITY_DIAG)  THEN
-           WRITE (PLT,*) ((FI1(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((NL1(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((PL1(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((SL1(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((FI2(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((NL2(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((PL2(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((SL2(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((FI3(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((NL3(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((PL3(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((SL3(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((NPP(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((GPP(I,K),I=1,MLOC),K=1,KBM1),               &
-                       ((RESP(I,K),I=1,MLOC),K=1,KBM1),              &
-                       ((KESS(I,K),I=1,MLOC),K=1,KBM1),              &
-                       ((CLSZ(I,K),I=1,MLOC),K=1,KBM1),              &
-                       ((CLLZ(I,K),I=1,MLOC),K=1,KBM1),              &
-                       (ASRAT(I),I=1,MLOC),(CFIX(I),I=1,MLOC),       &
-                       (SNFIX(I),I=1,MLOC),(FIB(I),I=1,MLOC),        &
-                       (NLB(I),I=1,MLOC),(PLB(I),I=1,MLOC),          &
-                       (NPPB(I),I=1,MLOC)
-         ENDIF
-
-         IF (SEDIMENT_DIAG)  THEN
-           WRITE (PLT,*) (BENDOC(I),I=1,MLOC),(BENNH4(I),I=1,MLOC),       &
-                       (BENNO3(I),I=1,MLOC), (BENPO4(I),I=1,MLOC),      &
-                       (BENCOD(I),I=1,MLOC), (BENCH4G(I),I=1,MLOC),     &
-                       (BENCH4A(I),I=1,MLOC),(BENDO(I),I=1,MLOC),       &
-                       (BENSA(I),I=1,MLOC),  (SSFWS(I),I=1,MLOC),       &
-                       (PCFWS(I),I=1,MLOC),  (PNFWS(I),I=1,MLOC),       &
-                       (PPFWS(I),I=1,MLOC),  (PSFWS(I),I=1,MLOC),       &
-                       ((CPOC(I,J),I=1,MLOC),J=1,3),                    &
-                       ((CPON(I,J),I=1,MLOC),J=1,3),                    &
-                       ((CPOP(I,J),I=1,MLOC),J=1,3),                    &
-                       (CPO4(I),I=1,MLOC),   (CPOS(I),I=1,MLOC),        &
-                       (BBM(I),I=1,MLOC),    (CNH4(I),I=1,MLOC),        &
-                       (CNO3(I),I=1,MLOC),   (CHS(I),I=1,MLOC),         &
-                       (CSI(I),I=1,MLOC),    (DIAGN(I),I=1,MLOC)
-         ENDIF
-
-       ENDIF
-     ENDIF
-    
-!
-!  *** Oxygen plots
-!
-!  KURT GLAESEMANN only MSR plots
-     IF (OXYGEN_PLOTS .AND. MSR) THEN
-       IF (JDAY >= NXOPL .OR. JDAY >= OPLD(OPLDP+1)) THEN
-         IF (JDAY >= OPLD(OPLDP+1)) THEN
-           OPLDP = OPLDP+1
-           NXOPL = OPLD(OPLDP)
-         ENDIF
-         NXOPL = NXOPL+OPLF(OPLDP)
-         WRITE (OPL) JDAY,DOVDAYS
-
-         DOVDAYS = 0.
-
-       ENDIF
-     ENDIF
-     
-!
-!******* Mass balance
-!
-
-! KURT GLAESEMANN only MSR prints
-     IF (MASS_BALANCE .AND. MSR) THEN
-       IF (JDAY >= NXMBL .OR. JDAY >= MBLD(MBLDP+1)) THEN
-         IF (JDAY >= MBLD(MBLDP+1)) THEN
-           MBLDP = MBLDP+1
-           NXMBL = MBLD(MBLDP)
-         ENDIF
-         NXMBL   = NXMBL+MBLF(MBLDP)
-         ELTMMBL = JDAY-JDAYMBL
-
-!*********** Calculate flux rates
-
-         DLWCKMNB = DLWCKMNB/ELTMMBL
-         DLWCKMCB = DLWCKMCB/ELTMMBL
-         S1FLXNB  = S1FLXNB/ELTMMBL
-         S1FLXPB  = S1FLXPB/ELTMMBL
-         S1FLXCB  = S1FLXCB/ELTMMBL
-         S2FLXNB  = S2FLXNB/ELTMMBL
-         S2FLXPB  = S2FLXPB/ELTMMBL
-         S2FLXCB  = S2FLXCB/ELTMMBL
-         S3FLXNB  = S3FLXNB/ELTMMBL
-         S3FLXPB  = S3FLXPB/ELTMMBL
-         S3FLXCB  = S3FLXCB/ELTMMBL
-
-         DLSEDKNB    = DLSEDKNB/ELTMMBL
-         DLSEDKCB    = DLSEDKCB/ELTMMBL
-         ATMFLXNB    = ATMFLXNB/ELTMMBL !divided time to get kgN/day
-         ATMFLXPB    = ATMFLXPB/ELTMMBL
-         BENFLXPNB   = BENFLXPNB/ELTMMBL
-         BENFLXDNB   = BENFLXDNB/ELTMMBL
-         BENFLXPPB   = BENFLXPPB/ELTMMBL
-         BENFLXDPB   = BENFLXDPB/ELTMMBL
-         BENFLXPCB   = BENFLXPCB/ELTMMBL
-         BURIALFLXNB = BURIALFLXNB/ELTMMBL
-         BURIALFLXPB = BURIALFLXPB/ELTMMBL
-         BURIALFLXCB = BURIALFLXCB/ELTMMBL
-
-!*********** Output flux rates
-
-         WRITE (MBL) JDAY
-         WRITE (MBL) DLWCKMNB,BENFLXPNB,BENFLXDNB,S1FLXNB,S2FLXNB,   &
-                     S3FLXNB,ATMFLXNB
-         WRITE (MBL) BENFLXPPB,BENFLXDPB,S1FLXPB,S2FLXPB,S3FLXPB,    &
-                     ATMFLXPB
-         WRITE (MBL) DLWCKMCB,BENFLXPCB,S1FLXCB,S2FLXCB,S3FLXCB
-         WRITE (MBL) DLSEDKNB,BURIALFLXNB
-         WRITE (MBL) BURIALFLXPB
-         WRITE (MBL) DLSEDKCB,BURIALFLXCB
-
-!*********** Reinitialize mass fluxes
-
-         DLWCKMNB = 0.0
-         DLWCKMCB = 0.0
-         S1FLXNB  = 0.0
-         S1FLXPB  = 0.0
-         S1FLXCB  = 0.0
-         S2FLXNB  = 0.0
-         S2FLXPB  = 0.0
-         S2FLXCB  = 0.0
-         S3FLXNB  = 0.0
-         S3FLXPB  = 0.0
-         S3FLXCB  = 0.0
-
-         DLSEDKNB    = 0.0
-         DLSEDKCB    = 0.0
-         ATMFLXNB    = 0.0
-         ATMFLXPB    = 0.0
-         BENFLXPNB   = 0.0
-         BENFLXDNB   = 0.0
-         BENFLXPPB   = 0.0
-         BENFLXDPB   = 0.0
-         BENFLXPCB   = 0.0
-         BURIALFLXNB = 0.0
-         BURIALFLXPB = 0.0
-         BURIALFLXCB = 0.0
-
-         JDAYMBL = JDAY
-       ENDIF
-     ENDIF  !END MASS_BALANCE
-
-!     
-!******* Average plots
-!
-
-!  KURT GLAESEMANN - only MSR plots
-     IF (AVERAGE_PLOTS .AND. MSR) THEN
-       IF (JDAY >= NXAPL .OR. JDAY >= APLTD(APLDP+1)) THEN
-         IF (JDAY >= APLTD(APLDP+1)) THEN
-           APLDP = APLDP+1
-           NXAPL = APLTD(APLDP)
-         ENDIF
-         NXAPL  = NXAPL+APLF(APLDP)
-         AVGINT = ELTMS-ELTMSPLT
-
-         AC1 = AC1/AVGINT
-
-         WRITE (APL) JDAY,(((AC1(I,K,AC(JCON)),                          &
-               C1MIN(I,K,AC(JCON)),C1MAX(I,K,AC(JCON)),I=1,MLOC),K=1,KBM1),JCON=1,NAC)
-
-         C1MIN = 1.E10
-         C1MAX = 0.0
-         AC1   = 0.0
-
-         ACCHL1  = ACCHL1/AVGINT
-         ACCHL2  = ACCHL2/AVGINT
-         ACCHL3  = ACCHL3/AVGINT
-
-         WRITE (APL) ((ACCHL1(I,K),I=1,MLOC),K=1,KBM1),                         &
-                     ((ACCHL2(I,K),I=1,MLOC),K=1,KBM1),                         &
-                     ((ACCHL3(I,K),I=1,MLOC),K=1,KBM1)
-
-         ACCHL1  = 0.0
-         ACCHL2  = 0.0
-         ACCHL3  = 0.0
-
-         IF (QUALITY_DIAG) THEN
-           AKE   = AKE/AVGINT 
-           AFI1  = AFI1/AVGINT
-           ANL1  = ANL1/AVGINT
-           APL1  = APL1/AVGINT
-           ASL1  = ASL1/AVGINT
-           AFI2  = AFI2/AVGINT
-           ANL2  = ANL2/AVGINT
-           APL2  = APL2/AVGINT
-           ASL2  = ASL2/AVGINT
-           AFI3  = AFI3/AVGINT
-           ANL3  = ANL3/AVGINT
-           APL3  = APL3/AVGINT
-           ASL3  = ASL3/AVGINT
-           ANPP  = ANPP/AVGINT
-           AGPP  = AGPP/AVGINT
-           ARESP = ARESP/AVGINT
-           ACLSZ = ACLSZ/AVGINT
-           ACLLZ = ACLLZ/AVGINT
-
-           AASRAT= AASRAT/AVGINT
-           ACFIX = ACFIX/AVGINT
-
-           AFIB  = AFIB/AVGINT
-           ANLB  = ANLB/AVGINT
-           APLB  = APLB/AVGINT
-           ANPPB = ANPPB/AVGINT
-
-           WRITE (APL) ((AFI1(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ANL1(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((APL1(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ASL1(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((AFI2(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ANL2(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((APL2(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ASL2(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((AFI3(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ANL3(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((APL3(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ASL3(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ANPP(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((AGPP(I,K),I=1,MLOC),K=1,KBM1),                 &
-                       ((ARESP(I,K),I=1,MLOC),K=1,KBM1),                &
-                       ((AKE(I,K),I=1,MLOC),K=1,KBM1),                  &
-                       ((ACLSZ(I,K),I=1,MLOC),K=1,KBM1),                &
-                       ((ACLLZ(I,K),I=1,MLOC),K=1,KBM1),                &
-                       (AASRAT(I),I=1,MLOC),(AFIB(I),I=1,MLOC),         &
-                       (ANLB(I),I=1,MLOC),(APLB(I),I=1,MLOC),           &
-                       (ANPPB(I),I=1,MLOC)
-
-           AKE   = 0.0 
-           AFI1  = 0.0
-           ANL1  = 0.0
-           APL1  = 0.0
-           ASL1  = 0.0
-           AFI2  = 0.0
-           ANL2  = 0.0
-           APL2  = 0.0
-           ASL2  = 0.0
-           AFI3  = 0.0
-           ANL3  = 0.0
-           APL3  = 0.0
-           ASL3  = 0.0
-           ANPP  = 0.0
-           AGPP  = 0.0
-           ARESP = 0.0
-           ACLSZ = 0.0
-           ACLLZ = 0.0
-
-           AASRAT= 0.0
-           ACFIX = 0.0
-
-           AFIB  = 0.0
-           ANLB  = 0.0
-           APLB  = 0.0
-           ANPPB = 0.0
-         ENDIF
-
-         IF (SEDIMENT_DIAG) THEN
-           ACPOS   = ACPOS/AVGINT
-           ACPIP   = ACPIP/AVGINT
-           ASSFWS  = ASSFWS/AVGINT
-           APCFWS  = APCFWS/AVGINT
-           APNFWS  = APNFWS/AVGINT
-           APPFWS  = APPFWS/AVGINT
-           APSFWS  = APSFWS/AVGINT
-           ABENDO  = ABENDO/AVGINT
-           ABENSA  = ABENSA/AVGINT
-           ABENDOC = ABENDOC/AVGINT
-           ABENNH4 = ABENNH4/AVGINT
-           ABENNO3 = ABENNO3/AVGINT
-           ABENPO4 = ABENPO4/AVGINT
-           ABENCOD = ABENCOD/AVGINT
-           ABENCH4G = ABENCH4G/AVGINT
-           ABENCH4A = ABENCH4A/AVGINT
-           ABBM    = ABBM/AVGINT
-           ABLITE  = ABLITE/AVGINT
-           ADFEED  = ADFEED/AVGINT
-
-           ASFEED  = ASFEED/AVGINT
-           ASF_SFGC  = ASF_SFGC/AVGINT
-           ASF_RESP  = ASF_RESP/AVGINT
-           ASF_PRED  = ASF_PRED/AVGINT
-           ASF_RMORT = ASF_RMORT/AVGINT
-
-           ADF_GROW = ADF_GROW/AVGINT
-           ADF_RESP = ADF_RESP/AVGINT
-           ADF_PRED = ADF_PRED/AVGINT
-           ADF_MORT = ADF_MORT/AVGINT
-           AJNSF = AJNSF/AVGINT
-           AJPSF = AJPSF/AVGINT
-           ASODSF = ASODSF/AVGINT
-           ASASF = ASASF/AVGINT
-           ASUSF = ASUSF/AVGINT
-           ASFGCIN = ASFGCIN/AVGINT
-           ASFCFEC = ASFCFEC/AVGINT
-           ASFCPSF = ASFCPSF/AVGINT
-           AFLXCSF = AFLXCSF/AVGINT
-           AFLXNSF = AFLXNSF/AVGINT
-           AFLXPSF = AFLXPSF/AVGINT
-           ARPOCSF = ARPOCSF/AVGINT
-           ARPONSF = ARPONSF/AVGINT
-           ARPOPSF = ARPOPSF/AVGINT
-           ASSISF = ASSISF/AVGINT
-           ASSISASF = ASSISASF/AVGINT
-           ASSISUSF = ASSISUSF/AVGINT
-           ASSIPSF = ASSIPSF/AVGINT
-
-           ACPOC = ACPOC/AVGINT
-           ACPON = ACPON/AVGINT
-           ACPOP = ACPOP/AVGINT
-
-           WRITE (APL) (ABENDOC(B),B=1,MLOC),(ABENNH4(B),B=1,MLOC),     &
-                       (ABENNO3(B),B=1,MLOC), (ABENPO4(B),B=1,MLOC),    &
-                       (ABENCOD(B),B=1,MLOC),                           &
-                       (ABENCH4G(B),B=1,MLOC), (ABENCH4A(B),B=1,MLOC),  &
-                       (ABENDO(B),B=1,MLOC),                            &
-                       (ABENSA(B),B=1,MLOC),  (ASSFWS(B),B=1,MLOC),     &
-                       (APCFWS(B),B=1,MLOC),  (APNFWS(B),B=1,MLOC),     &
-                       (APPFWS(B),B=1,MLOC),  (APSFWS(B),B=1,MLOC),     &
-                       ((ACPOC(B,J),B=1,MLOC),J=1,3),                   &
-                       ((ACPON(B,J),B=1,MLOC),J=1,3),                   &
-                       ((ACPOP(B,J),B=1,MLOC),J=1,3),                   &
-                       (ACPIP(B),B=1,MLOC),                             &
-                       (ACPOS(B),B=1,MLOC),  (ABBM(B),B=1,MLOC),        &
-                       (ABLITE(B),B=1,MLOC),  (ADFEED(B),B=1,MLOC),     &
-                       ((ASFEED(B,K),B=1,MLOC),K=1,NSSFP)
-
-
-          IF (SFEEDER) THEN 
-             WRITE (SFO) (AJNSF(B),B=1,MLOC),(AJPSF(B),B=1,MLOC)       &
-                    ,(ASODSF(B),B=1,MLOC),(ASASF(B),B=1,MLOC)          &
-                    ,(ASUSF(B),B=1,MLOC)                               &
-                    ,(ASFGCIN(B),B=1,MLOC),(ASFCFEC(B),B=1,MLOC)       &
-                    ,(ASFCPSF(B),B=1,MLOC),(AFLXCSF(B),B=1,MLOC)       &
-                    ,(AFLXNSF(B),B=1,MLOC),(AFLXPSF(B),B=1,MLOC)       &
-                    ,(ARPOCSF(B),B=1,MLOC),(ARPONSF(B),B=1,MLOC)       &
-                    ,(ARPOPSF(B),B=1,MLOC),(ASSISF(B),B=1,MLOC)        &
-                    ,(ASSISASF(B),B=1,MLOC),(ASSISUSF(B),B=1,MLOC)     &
-                    ,(ASSIPSF(B),B=1,MLOC)                             &
-                    ,((ASF_SFGC(B,K),B=1,MLOC),K=1,NSSFP)              &
-                    ,((ASF_RESP(B,K),B=1,MLOC),K=1,NSSFP)              &
-                    ,((ASF_PRED(B,K),B=1,MLOC),K=1,NSSFP)              &
-                    ,((ASF_RMORT(B,K),B=1,MLOC),K=1,NSSFP)             &
-                    ,(ADF_GROW(B),B=1,MLOC),(ADF_RESP(B),B=1,MLOC)     &
-                    ,(ADF_PRED(B),B=1,MLOC),(ADF_MORT(B),B=1,MLOC)
-           ENDIF
-
-           ACPOS   = 0.0
-           ACPIP   = 0.0
-           ASSFWS  = 0.0
-           APCFWS  = 0.0
-           APNFWS  = 0.0
-           APPFWS  = 0.0
-           APSFWS  = 0.0
-           ABENDO  = 0.0
-           ABENSA  = 0.0
-           ABENDOC = 0.0
-           ABENNH4 = 0.0
-           ABENNO3 = 0.0
-           ABENPO4 = 0.0
-           ABENCOD = 0.0
-           ABENCH4G = 0.0
-           ABENCH4A = 0.0
-           ABBM    = 0.0
-           ABLITE  = 0.0
-           ADFEED  = 0.0
-
-           ASFEED = 0.0
-           ASF_SFGC  = 0.0
-           ASF_RESP  = 0.0
-           ASF_PRED  = 0.0
-           ASF_RMORT = 0.0
-
-           ADF_GROW = 0.0
-           ADF_RESP = 0.0
-           ADF_PRED = 0.0
-           ADF_MORT = 0.0
-           AJNSF = 0.0
-           AJPSF = 0.0
-           ASODSF = 0.0
-           ASASF = 0.0
-           ASUSF = 0.0
-           ASFGCIN = 0.0
-           ASFCFEC = 0.0
-           ASFCPSF = 0.0
-           AFLXCSF = 0.0
-           AFLXNSF = 0.0
-           AFLXPSF = 0.0
-           ARPOCSF = 0.0
-           ARPONSF = 0.0
-           ARPOPSF = 0.0
-           ASSISF = 0.0
-           ASSISASF = 0.0
-           ASSISUSF = 0.0
-           ASSIPSF = 0.0
-
-           ACPOC = 0.0
-           ACPON = 0.0
-           ACPOP = 0.0
-         ENDIF
-
-       ENDIF  !END AVERAGE_PLOTS
-       
-!
-!******* Transport fluxes
-!
-
-! KURT GLAESEMANN - only MSR plots
-       IF (TRANSPORT_FLUXES .AND. MSR) THEN
-         IF (JDAY >= NXTFL .OR. JDAY >= TFLD(TFLDP+1)) THEN
-           IF (JDAY >= TFLD(TFLDP+1)) THEN
-             TFLDP = TFLDP+1
-             NXTFL = TFLD(TFLDP)
-           ENDIF
-           NXTFL = NXTFL+TFLF(TFLDP)
-           DO JCON=1,13
-             DO F=1,NQF
-               AFLUX(F,JCON) = AFLUX(F,JCON)/(ELTMS-ELTMSTFL)
-             ENDDO
-           ENDDO          
-           WRITE (TFL) JDAY,AFLUX
-           DO JCON=1,13
-             DO F=1,NQF
-               AFLUX(F,JCON) = 0.0
-             ENDDO
-           ENDDO          
-           ELTMSTFL = ELTMS
-         ENDIF
-       ENDIF !END TRANSPORT_FLUXES
-
-!******* Kinetic fluxes
-
-! KURT GLAESEMANN - only MSR plots
-       IF (KINETIC_FLUXES .and. MSR) THEN                           !MNOEL
-         IF (JDAY >= NXKFL .OR. JDAY >= KFLD(KFLDP+1)) THEN
-           IF (JDAY >= KFLD(KFLDP+1)) THEN
-             KFLDP = KFLDP+1
-             NXKFL = KFLD(KFLDP)
-           ENDIF
-           NXKFL = NXKFL+KFLF(KFLDP)
-           AVGINT = ELTMS-ELTMSKFL
-
-           A_T      = A_T/AVGINT
-           AP1      = AP1/AVGINT
-           ABM1     = ABM1/AVGINT
-           APR1     = APR1/AVGINT
-           AP2      = AP2/AVGINT
-           ABM2     = ABM2/AVGINT
-           APR2     = APR2/AVGINT
-           AP3      = AP3/AVGINT
-           ABM3     = ABM3/AVGINT
-           APR3     = APR3/AVGINT
-           AALGDOC  = AALGDOC/AVGINT
-           AALGPOC  = AALGPOC/AVGINT
-           ADENIT   = ADENIT/AVGINT
-           AMNLDOC  = AMNLDOC/AVGINT
-           AHDRPOC  = AHDRPOC/AVGINT
-           AALGNH4  = AALGNH4/AVGINT
-           AALGNO3  = AALGNO3/AVGINT
-           AALGDON  = AALGDON/AVGINT
-           AALGPON  = AALGPON/AVGINT
-           ANT      = ANT/AVGINT
-           ANFIX    = ANFIX/AVGINT
-           ADENNO3  = ADENNO3/AVGINT
-           AMNLDON  = AMNLDON/AVGINT
-           AHDRPON  = AHDRPON/AVGINT
-           AALGPO4  = AALGPO4/AVGINT
-           AALGDOP  = AALGDOP/AVGINT
-           AALGPOP  = AALGPOP/AVGINT
-           AMNLDOP  = AMNLDOP/AVGINT
-           AHDRPOP  = AHDRPOP/AVGINT
-           APSD     = APSD/AVGINT
-           ASAP     = ASAP/AVGINT
-           AALGUP   = AALGUP/AVGINT
-           AALGRES  = AALGRES/AVGINT
-           ADO      = ADO/AVGINT
-           ADORALG  = ADORALG/AVGINT
-           ADOPR    = ADOPR/AVGINT
-           ADCOD    = ADCOD/AVGINT
-           ADDOC    = ADDOC/AVGINT
-           ANITRIF  = ANITRIF/AVGINT
-
-           ARSZ     = ARSZ   /AVGINT
-           ARLZ     = ARLZ   /AVGINT
-           ABMSZ    = ABMSZ  /AVGINT
-           ABMLZ    = ABMLZ  /AVGINT
-           AMSZ     = AMSZ   /AVGINT
-           AMLZ     = AMLZ   /AVGINT
-           APRSZLZ  = APRSZLZ/AVGINT
-           AGSZ     = AGSZ   /AVGINT
-           AGLZ     = AGLZ   /AVGINT
-           ADOCSZ   = ADOCSZ /AVGINT
-           APOCSZ   = APOCSZ /AVGINT
-           ADOCLZ   = ADOCLZ /AVGINT
-           APOCLZ   = APOCLZ /AVGINT
-           ANH4SZ   = ANH4SZ /AVGINT
-           ADONSZ   = ADONSZ /AVGINT
-           APONSZ   = APONSZ /AVGINT
-           ANH4LZ   = ANH4LZ /AVGINT
-           ADONLZ   = ADONLZ /AVGINT
-           APONLZ   = APONLZ /AVGINT
-           APO4SZ   = APO4SZ /AVGINT
-           ADOPSZ   = ADOPSZ /AVGINT
-           APOPSZ   = APOPSZ /AVGINT
-           APO4LZ   = APO4LZ /AVGINT
-           ADOPLZ   = ADOPLZ /AVGINT
-           APOPLZ   = APOPLZ /AVGINT
-           APRSZ    = APRSZ  /AVGINT
-           APRLZ    = APRLZ  /AVGINT
-          
-           AB1SZ    = AB1SZ/AVGINT
-           AB2SZ    = AB2SZ/AVGINT
-           AB3SZ    = AB3SZ/AVGINT
-           AB1LZ    = AB1LZ/AVGINT
-           AB2LZ    = AB2LZ/AVGINT
-           AB3LZ    = AB3LZ/AVGINT
-           ADOSZ    = ADOSZ/AVGINT
-           ADOLZ    = ADOLZ/AVGINT
-           ASASZ    = ASASZ/AVGINT
-           ASUSZ    = ASUSZ/AVGINT
-           ASALZ    = ASALZ/AVGINT
-           ASULZ    = ASULZ/AVGINT
-
-
-           IF (SAV_CALC) THEN
-                !Wen Long here we should  calculate the average of SAV fluxes
-           ENDIF
-                              
-           IF (BALGAE_CALC) THEN
-             ABMB       = ABMB/AVGINT
-             APB        = APB/AVGINT
-             APRB       = APRB/AVGINT
-             ABADOC     = ABADOC/AVGINT
-             ABAPOC     = ABAPOC/AVGINT
-             ABANH4     = ABANH4/AVGINT
-             ABANO3     = ABANO3/AVGINT
-             ABAPON     = ABAPON/AVGINT
-             ABAPO4     = ABAPO4/AVGINT
-             ABAPOP     = ABAPOP/AVGINT
-             ABADO      = ABADO/AVGINT
-           ENDIF                      
-
-           WRITE(KFL) JDAY 
-           WRITE(KFL) A_T,      AP1,      ABM1,     APR1,            &
-                      AP2,      ABM2,     APR2,     AP3,             &
-                      ABM3,     APR3
-           WRITE(KFL) AALGDOC,  AALGPOC,  ADENIT,   AMNLDOC,         &
-                      AHDRPOC
-           WRITE(KFL) AALGNH4,  AALGNO3,  AALGDON,  AALGPON,         &
-                      ANT,      ADENNO3,  AMNLDON,  AHDRPON,         &
-                      ANFIX
-           WRITE(KFL) AALGPO4,  AALGDOP,  AALGPOP,  AMNLDOP,         &
-                      AHDRPOP
-           WRITE(KFL) APSD,     ASAP,     AALGUP,   AALGRES
-           WRITE(KFL) ADO,      ADORALG,  ADOPR,    ADCOD,           &
-                      ADDOC,    ANITRIF
-           WRITE(KFL) ARSZ,   ARLZ,   ABMSZ,   ABMLZ,                 &
-                      AMSZ,   AMLZ,   APRSZLZ, AGSZ,  AGLZ,   ADOCSZ, &
-                      APOCSZ, ADOCLZ, APOCLZ,                         &
-                      ANH4SZ, ADONSZ, APONSZ,  ANH4LZ,                &
-                      ADONLZ, APONLZ, APO4SZ,  ADOPSZ, APOPSZ,        &
-                      APO4LZ, ADOPLZ, APOPLZ,                         &
-                      APRSZ,  APRLZ
-           WRITE(KFL) AB1SZ,  AB2SZ,  AB3SZ,   AB1LZ, AB2LZ,  AB3LZ,  &
-                      ADOSZ,  ADOLZ,  ASASZ,   ASUSZ, ASALZ,  ASULZ
-
-           IF (SAV_CALC) THEN
-!WL missing losts of stuff here
-           ENDIF
-           IF (BALGAE_CALC)WRITE(KFL)                                &
-                        ABMB,     APB,      APRB,     ABADOC,         &
-                        ABAPOC,   ABANH4,   ABANO3,   ABAPON,         &
-                        ABAPO4,   ABAPOP,   ABADO
-
-           A_T      = 0.0
-           AP1      = 0.0
-           ABM1     = 0.0
-           APR1     = 0.0
-           AP2      = 0.0
-           ABM2     = 0.0
-           APR2     = 0.0
-           AP3      = 0.0
-           ABM3     = 0.0
-           APR3     = 0.0
-           AALGDOC  = 0.0
-           AALGPOC  = 0.0
-           ADENIT   = 0.0
-           AMNLDOC  = 0.0
-           AHDRPOC  = 0.0
-           AALGNH4  = 0.0
-           AALGNO3  = 0.0
-           AALGDON  = 0.0
-           AALGPON  = 0.0
-           ANT      = 0.0
-           ANFIX    = 0.0
-           ADENNO3  = 0.0
-           AMNLDON  = 0.0
-           AHDRPON  = 0.0
-           AALGPO4  = 0.0
-           AALGDOP  = 0.0
-           AALGPOP  = 0.0
-           AMNLDOP  = 0.0
-           AHDRPOP  = 0.0
-           APSD     = 0.0
-           ASAP     = 0.0
-           AALGUP   = 0.0
-           AALGRES  = 0.0
-           ADO      = 0.0
-           ADORALG  = 0.0
-           ADOPR    = 0.0
-           ADCOD    = 0.0
-           ADDOC    = 0.0
-           ANITRIF  = 0.0
-
-           ARSZ     = 0.0
-           ARLZ     = 0.0
-           ABMSZ    = 0.0
-           ABMLZ    = 0.0
-           AMSZ     = 0.0
-           AMLZ     = 0.0
-           APRSZLZ  = 0.0
-           AGSZ     = 0.0
-           AGLZ     = 0.0
-           ADOCSZ   = 0.0
-           APOCSZ   = 0.0
-           ADOCLZ   = 0.0
-           APOCLZ   = 0.0
-           ANH4SZ   = 0.0
-           ADONSZ   = 0.0
-           APONSZ   = 0.0
-           ANH4LZ   = 0.0
-           ADONLZ   = 0.0
-           APONLZ   = 0.0
-           APO4SZ   = 0.0
-           ADOPSZ   = 0.0
-           APOPSZ   = 0.0
-           APO4LZ   = 0.0
-           ADOPLZ   = 0.0
-           APOPLZ   = 0.0
-           APRSZ    = 0.0
-           APRLZ    = 0.0
-            
-           AB1SZ    = 0.0
-           AB2SZ    = 0.0
-           AB3SZ    = 0.0
-           AB1LZ    = 0.0
-           AB2LZ    = 0.0
-           AB3LZ    = 0.0
-           ADOSZ    = 0.0
-           ADOLZ    = 0.0
-           ASASZ    = 0.0
-           ASUSZ    = 0.0
-           ASALZ    = 0.0
-           ASULZ    = 0.0
-
-            
-           ABMB       = 0.0
-           APB        = 0.0
-           APRB       = 0.0
-           ABADOC     = 0.0
-           ABAPOC     = 0.0
-           ABANH4     = 0.0
-           ABANO3     = 0.0
-           ABAPON     = 0.0
-           ABAPO4     = 0.0
-           ABAPOP     = 0.0
-           ABADO      = 0.0
-                                 
-           ELTMSKFL = ELTMS
-         ENDIF
-       ENDIF  !END KINETIC_FLUXES
-
-! END KILLTREES if defined block
-# endif
 
 
 	 IF(MSR)THEN
@@ -4531,33 +3591,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 !***** Integrate sediments POM to steady state                               !MNOEL 2-5-93
 
      IF (STEADY_STATE_SED_G3) CALL SED_DIAGENESIS_G3  
-        
-# if defined KILLTREES
 
-! KURT GLAESEMANN - only print to MSR
-     IF(MSR) THEN
-        OPEN (ICO,FILE=ICOFN,FORM='UNFORMATTED') 
-        WRITE (ICO) TITLE
-        WRITE (ICO) (((C1(I,K,J),I=0,MLOC),K=1,KBM1),J=1,NCP)  !Wen Long, here we need to read global arrays!
-        
-        IF (SEDIMENT_CALC) WRITE (ICO) (CTEMP(B),B=1,MLOC),             &
-           ((CPOP(B,J),B=1,MLOC),J=1,3),                                 &
-           ((CPON(B,J),B=1,MLOC),J=1,3),                                 &
-           ((CPOC(B,J),B=1,MLOC),J=1,3),                                 &
-           (CPOS(B),B=1,MLOC),                                           &
-           (PO4T2TM1S(B),B=1,MLOC), (NH4T2TM1S(B),B=1,MLOC),              &
-           (NO3T2TM1S(B),B=1,MLOC), (HST2TM1S(B),B=1,MLOC),               &
-           (CH4T2TM1S(B),B=1,MLOC), (CH41TM1S(B),B=1,MLOC),               &
-           (SO4T2TM1S(B),B=1,MLOC), (SIT2TM1S(B),B=1,MLOC),               &
-           (BENSTRTM1S(B),B=1,MLOC),  (BBM(B),B=1,MLOC)
-
-       IF (DFEEDER) WRITE (ICO) (DFEEDM1S(B),B=1,MLOC)
-       IF (SFEEDER) WRITE (ICO) ((SFEED(B,K),B=1,MLOC),K=1,NSPECIES)
-
-
-       CLOSE (ICO)
-     ENDIF
-# endif
    ENDIF
 
 
@@ -4636,582 +3670,8 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
  5000 FORMAT(10(1X,1PE10.2E2))
 !KURT below
  5001 CONTINUE
-!     
-!WLong moved this to mod_zoop     
-!     IF(ALLOCATED(SZ)) DEALLOCATE (SZ)
-!     IF(ALLOCATED(LZ)) DEALLOCATE (LZ)
-!
+
  
-!KURT 17 Sept deallocate allocated arrays
- 
- !WLong moved this to mod_wqm.F WQM_DEALLOC() 
-!     IF(ALLOCATED(T)) DEALLOCATE (T)
-!     IF(ALLOCATED(SALT)) DEALLOCATE (SALT)
-!     IF(ALLOCATED(SSI)) DEALLOCATE (SSI)
-!     IF(ALLOCATED(B1)) DEALLOCATE (B1)
-!     IF(ALLOCATED(B2)) DEALLOCATE (B2)
-!     IF(ALLOCATED(B3)) DEALLOCATE (B3)
-!     IF(ALLOCATED(LDOC)) DEALLOCATE (LDOC)
-!     IF(ALLOCATED(LPOC)) DEALLOCATE (LPOC)
-!     IF(ALLOCATED(RPOC)) DEALLOCATE (RPOC)
-!     IF(ALLOCATED(NH4)) DEALLOCATE (NH4)
-!     IF(ALLOCATED(NO3)) DEALLOCATE (NO3)
-!     IF(ALLOCATED(LDON)) DEALLOCATE (LDON)
-!     IF(ALLOCATED(LPON)) DEALLOCATE (LPON)
-!     IF(ALLOCATED(RPON)) DEALLOCATE (RPON)
-!     IF(ALLOCATED(PO4)) DEALLOCATE (PO4)
-!     IF(ALLOCATED(LDOP)) DEALLOCATE (LDOP)
-!     IF(ALLOCATED(LPOP)) DEALLOCATE (LPOP)
-!     IF(ALLOCATED(RPOP)) DEALLOCATE (RPOP)
-!     IF(ALLOCATED(COD)) DEALLOCATE (COD)
-!     IF(ALLOCATED(DOXG)) DEALLOCATE (DOXG)
-!     IF(ALLOCATED(SIUPB)) DEALLOCATE (SIUPB)
-!     IF(ALLOCATED(SIAT)) DEALLOCATE (SIAT)
-!     IF(ALLOCATED(RDOC)) DEALLOCATE (RDOC)
-!     IF(ALLOCATED(RDON)) DEALLOCATE (RDON)
-!     IF(ALLOCATED(RDOP)) DEALLOCATE (RDOP)
-     
-!     IF(ALLOCATED(UREA)) DEALLOCATE (UREA)
-     
-!     IF(ALLOCATED(PIP)) DEALLOCATE (PIP)
-!     IF(ALLOCATED(PIB1)) DEALLOCATE (PIB1)
-!     IF(ALLOCATED(PIB2)) DEALLOCATE (PIB2)
-!     IF(ALLOCATED(PIB3)) DEALLOCATE (PIB3)
- 
-!     IF(ALLOCATED(PN1)) DEALLOCATE (PN1)
-!     IF(ALLOCATED(PN2)) DEALLOCATE (PN2)
-!     IF(ALLOCATED(PN3)) DEALLOCATE (PN3)
- 
-!     IF(ALLOCATED(BM1)) DEALLOCATE (BM1)
-!     IF(ALLOCATED(BM2)) DEALLOCATE (BM2)
-!     IF(ALLOCATED(BM3)) DEALLOCATE (BM3)
- 
-!     IF(ALLOCATED(MNLLDOC)) DEALLOCATE (MNLLDOC)
-!      IF(ALLOCATED(MNLRDOC)) DEALLOCATE (MNLRDOC) 
-!     IF(ALLOCATED(FTCOD)) DEALLOCATE (FTCOD)
- 
-!     IF(ALLOCATED(NPP)) DEALLOCATE (NPP)
-!     IF(ALLOCATED(P1)) DEALLOCATE (P1)
-!     IF(ALLOCATED(P2)) DEALLOCATE (P2)
-!     IF(ALLOCATED(P3)) DEALLOCATE (P3)
- 
-!     IF(ALLOCATED(NT)) DEALLOCATE (NT)
-!     IF(ALLOCATED(PR1)) DEALLOCATE (PR1)
-!     IF(ALLOCATED(PR2)) DEALLOCATE (PR2)
-!     IF(ALLOCATED(PR3)) DEALLOCATE (PR3)
-     
-!     IF(ALLOCATED(DENIT)) DEALLOCATE (DENIT)
-!     IF(ALLOCATED(RATOX)) DEALLOCATE (RATOX)
-!     IF(ALLOCATED(GPP)) DEALLOCATE (GPP)
- 
-!     IF(ALLOCATED(P1NNF)) DEALLOCATE (P1NNF)
-!     IF(ALLOCATED(ASRAT)) DEALLOCATE (ASRAT)
- 
-!     IF(ALLOCATED(KE)) DEALLOCATE (KE)
-
-!     IF(ALLOCATED(KEISS)) DEALLOCATE (KEISS)    !Should remove
-!     IF(ALLOCATED(KEVSS)) DEALLOCATE (KEVSS)    !shoudl remove
-!     IF(ALLOCATED(KEDOC)) DEALLOCATE (KEDOC)    !should remove
-  
-!     IF(ALLOCATED(FI1)) DEALLOCATE (FI1)
-!     IF(ALLOCATED(FI2)) DEALLOCATE (FI2)
-!     IF(ALLOCATED(FI3)) DEALLOCATE (FI3)
- 
-!     IF(ALLOCATED(NL1)) DEALLOCATE (NL1)
-!     IF(ALLOCATED(NL2)) DEALLOCATE (NL2)
-!     IF(ALLOCATED(NL3)) DEALLOCATE (NL3)
-!     IF(ALLOCATED(PL1)) DEALLOCATE (PL1)
-!     IF(ALLOCATED(PL2)) DEALLOCATE (PL2)
-!     IF(ALLOCATED(PL3)) DEALLOCATE (PL3)
- 
-!     IF(ALLOCATED(RESP)) DEALLOCATE (RESP)
-
-!     IF(ALLOCATED(SL1)) DEALLOCATE (SL1)
-!     IF(ALLOCATED(SL2)) DEALLOCATE (SL2)     
-!     IF(ALLOCATED(SL3)) DEALLOCATE (SL3)
-!     IF(ALLOCATED(PM1)) DEALLOCATE (PM1)
-!     IF(ALLOCATED(PM2)) DEALLOCATE (PM2)
-!     IF(ALLOCATED(PM3)) DEALLOCATE (PM3)
-!     IF(ALLOCATED(BMR1)) DEALLOCATE (BMR1)
-!     IF(ALLOCATED(BMR2)) DEALLOCATE (BMR2)
-!     IF(ALLOCATED(BMR3)) DEALLOCATE (BMR3)
-!     IF(ALLOCATED(BPR1)) DEALLOCATE (BPR1)
-!     IF(ALLOCATED(BPR2)) DEALLOCATE (BPR2)
-!     IF(ALLOCATED(BPR3)) DEALLOCATE (BPR3)
- 
-!     IF(ALLOCATED(CCHL1)) DEALLOCATE (CCHL1)
-!     IF(ALLOCATED(CCHL2)) DEALLOCATE (CCHL2)
-!     IF(ALLOCATED(CCHL3)) DEALLOCATE (CCHL3)
-     
-!     IF(ALLOCATED(DEPTHR))DEALLOCATE(DEPTHR)     
-
-!     IF(ALLOCATED(Q1)) DEALLOCATE (Q1)
-!     IF(ALLOCATED(Q2)) DEALLOCATE (Q2)
-!     IF(ALLOCATED(Q3)) DEALLOCATE (Q3)
-!!     IF(ALLOCATED(DTUREA)) DEALLOCATE (DTUREA)
-
-
-     
-!     IF(ALLOCATED(CFIX)) DEALLOCATE (CFIX)
-!     IF(ALLOCATED(SNFIX)) DEALLOCATE (SNFIX)
-!     IF(ALLOCATED(WSS)) DEALLOCATE (WSS)
-!     IF(ALLOCATED(WSL)) DEALLOCATE (WSL)
-!     IF(ALLOCATED(WSR)) DEALLOCATE (WSR)
-!     IF(ALLOCATED(WS1)) DEALLOCATE (WS1)
-!     IF(ALLOCATED(WS2)) DEALLOCATE (WS2)
-!     IF(ALLOCATED(WS3)) DEALLOCATE (WS3)
-!     IF(ALLOCATED(WSU)) DEALLOCATE (WSU)
-!     IF(ALLOCATED(WSSHI)) DEALLOCATE (WSSHI)
-!     IF(ALLOCATED(WSUNET)) DEALLOCATE (WSUNET) 
- 
-!     IF(ALLOCATED(FLXSPIB1)) DEALLOCATE (FLXSPIB1)
-!     IF(ALLOCATED(FLXSPIB2)) DEALLOCATE (FLXSPIB2)
-!     IF(ALLOCATED(FLXSPIB3)) DEALLOCATE (FLXSPIB3)
- 
-!     IF(ALLOCATED(V1)) DEALLOCATE (V1)
-!     IF(ALLOCATED(V2)) DEALLOCATE (V2)
- 
-!     IF(ALLOCATED(WSSNET)) DEALLOCATE (WSSNET)
-!     IF(ALLOCATED(WSLNET)) DEALLOCATE (WSLNET)
-!     IF(ALLOCATED(WSRNET)) DEALLOCATE (WSRNET)
-!     IF(ALLOCATED(WS1NET)) DEALLOCATE (WS1NET)
-!     IF(ALLOCATED(WS2NET)) DEALLOCATE (WS2NET)
-!     IF(ALLOCATED(WS3NET)) DEALLOCATE (WS3NET)
-     
-!       IF(ALLOCATED(DIAGP)) DEALLOCATE (DIAGP)
-!     IF(ALLOCATED(DIAGN)) DEALLOCATE (DIAGN)
-!     IF(ALLOCATED(DIAGC)) DEALLOCATE (DIAGC)
-!     IF(ALLOCATED(DIAGS)) DEALLOCATE (DIAGS)
- 
-!     IF(ALLOCATED(MTVEL)) DEALLOCATE (MTVEL)
-!     IF(ALLOCATED(BL)) DEALLOCATE (BL)
-!     IF(ALLOCATED(V1S)) DEALLOCATE (V1S)
-!     IF(ALLOCATED(HMV)) DEALLOCATE (HMV)
-!     IF(ALLOCATED(HMBV)) DEALLOCATE (HMBV)
-
-!     IF(ALLOCATED(DTM)) DEALLOCATE (DTM)
-     
-     
-!     IF(ALLOCATED(ALGDOC)) DEALLOCATE (ALGDOC)
-!     IF(ALLOCATED(ALGPOC)) DEALLOCATE (ALGPOC)
-     
-!     IF(ALLOCATED(HDRLPOC)) DEALLOCATE (HDRLPOC)
-!     IF(ALLOCATED(HDRRPOC)) DEALLOCATE (HDRRPOC)
-
-!      IF(ALLOCATED(KLDC)) DEALLOCATE (KLDC)
-!     IF(ALLOCATED(KRDC)) DEALLOCATE (KRDC)
-     
-!     IF(ALLOCATED(KDCALG)) DEALLOCATE (KDCALG)
-!     IF(ALLOCATED(KLCALG)) DEALLOCATE (KLCALG)
- 
-!     IF(ALLOCATED(KLPC)) DEALLOCATE (KLPC)     
-!     IF(ALLOCATED(KRPC)) DEALLOCATE (KRPC)
- 
-!     IF(ALLOCATED(KSUA)) DEALLOCATE (KSUA)
-!     IF(ALLOCATED(KCOD)) DEALLOCATE (KCOD)
-     
-!     IF(ALLOCATED(KLDN)) DEALLOCATE (KLDN)
-!     IF(ALLOCATED(KRDN)) DEALLOCATE (KRDN)
- 
-!     IF(ALLOCATED(KLDP)) DEALLOCATE (KLDP)
-!     IF(ALLOCATED(KRDP)) DEALLOCATE (KRDP)
-     
-!     IF(ALLOCATED(KDNALG)) DEALLOCATE (KDNALG)
-!     IF(ALLOCATED(KDPALG)) DEALLOCATE (KDPALG)
-     
-!     IF(ALLOCATED(KLPN)) DEALLOCATE (KLPN)
-!     IF(ALLOCATED(KRPN)) DEALLOCATE (KRPN)
-     
-!     IF(ALLOCATED(KLPP)) DEALLOCATE (KLPP)
-!     IF(ALLOCATED(KRPP)) DEALLOCATE (KRPP)     
-     
-!     IF(ALLOCATED(KLNALG)) DEALLOCATE (KLNALG)
-!     IF(ALLOCATED(KLPALG)) DEALLOCATE (KLPALG)
-
-
-!     IF(ALLOCATED(NTM)) DEALLOCATE (NTM)
-!     IF(ALLOCATED(KRCOAG)) DEALLOCATE (KRCOAG)
- 
- 
-!     IF(ALLOCATED(FTMNL)) DEALLOCATE (FTMNL)
-!     IF(ALLOCATED(FTHDR)) DEALLOCATE (FTHDR)
-     
-!     IF(ALLOCATED(RESPC)) DEALLOCATE (RESPC)
-!     IF(ALLOCATED(DLALGC)) DEALLOCATE (DLALGC)
- 
-!     IF(ALLOCATED(ALGNH4)) DEALLOCATE (ALGNH4)
-!     IF(ALLOCATED(ALGNO3)) DEALLOCATE (ALGNO3)
-!     IF(ALLOCATED(ALGDON)) DEALLOCATE (ALGDON)
-!     IF(ALLOCATED(ALGPON)) DEALLOCATE (ALGPON)
-!     IF(ALLOCATED(DENNO3)) DEALLOCATE (DENNO3)
-!     IF(ALLOCATED(MNLLDON)) DEALLOCATE (MNLLDON)
-!     IF(ALLOCATED(MNLRDON)) DEALLOCATE (MNLRDON) 
-!     IF(ALLOCATED(HDRLPON)) DEALLOCATE (HDRLPON)
-!     IF(ALLOCATED(HDRRPON)) DEALLOCATE (HDRRPON)
-
-!     IF(ALLOCATED(NFIX)) DEALLOCATE (NFIX)
- 
-!     IF(ALLOCATED(ALGPO4)) DEALLOCATE (ALGPO4)
-!     IF(ALLOCATED(ALGDOP)) DEALLOCATE (ALGDOP)
-!     IF(ALLOCATED(ALGPOP)) DEALLOCATE (ALGPOP)
-!     IF(ALLOCATED(MNLLDOP)) DEALLOCATE (MNLLDOP)
-!     IF(ALLOCATED(MNLRDOP)) DEALLOCATE (MNLRDOP)     
-!     IF(ALLOCATED(HDRLPOP)) DEALLOCATE (HDRLPOP)
-!     IF(ALLOCATED(HDRRPOP)) DEALLOCATE (HDRRPOP)
-     
-     
-!     IF(ALLOCATED(DORALG)) DEALLOCATE (DORALG)
-!     IF(ALLOCATED(DOPR)) DEALLOCATE (DOPR)
-!     IF(ALLOCATED(DCOD)) DEALLOCATE (DCOD)
-!     IF(ALLOCATED(DDOC)) DEALLOCATE (DDOC)
-     
-!     IF(ALLOCATED(NITRIF)) DEALLOCATE (NITRIF)
-!     IF(ALLOCATED(PSD)) DEALLOCATE (PSD)
-!     IF(ALLOCATED(SAP)) DEALLOCATE (SAP)
-     
-!     IF(ALLOCATED(ALGUP)) DEALLOCATE (ALGUP)
-!     IF(ALLOCATED(ALGRES)) DEALLOCATE (ALGRES)
-     
-!     IF(ALLOCATED(BENDOC)) DEALLOCATE (BENDOC)
-!     IF(ALLOCATED(BENNH4)) DEALLOCATE (BENNH4)
-!     IF(ALLOCATED(BENNO3)) DEALLOCATE (BENNO3)
-!     IF(ALLOCATED(BENDON)) DEALLOCATE (BENDON)
-!     IF(ALLOCATED(BENDOP)) DEALLOCATE (BENDOP)
-!     IF(ALLOCATED(BENPO4)) DEALLOCATE (BENPO4)
-!     IF(ALLOCATED(BENCOD)) DEALLOCATE (BENCOD)
-!     IF(ALLOCATED(BENDO)) DEALLOCATE (BENDO)
-!     IF(ALLOCATED(BENSA)) DEALLOCATE (BENSA)
-!     IF(ALLOCATED(BENDEN)) DEALLOCATE (BENDEN)
-!     IF(ALLOCATED(BENCH4G)) DEALLOCATE (BENCH4G)
-!     IF(ALLOCATED(BENCH4A)) DEALLOCATE (BENCH4A)
-     
-
-!     IF(ALLOCATED(C1)) DEALLOCATE (C1)
-!     IF(ALLOCATED(C2)) DEALLOCATE (C2)
-!     IF(ALLOCATED(C2F)) DEALLOCATE (C2F)
-!     IF(ALLOCATED(CSTAR)) DEALLOCATE (CSTAR)
-!     IF(ALLOCATED(DTC)) DEALLOCATE (DTC)
-!     IF(ALLOCATED(AC1)) DEALLOCATE (AC1)
- 
-!     IF(ALLOCATED(QLIT)) DEALLOCATE (QLIT)
-!     IF(ALLOCATED(CONLIT)) DEALLOCATE (CONLIT)
-     
-!     IF(ALLOCATED(AFI1)) DEALLOCATE (AFI1)
-!     IF(ALLOCATED(AFI2)) DEALLOCATE (AFI2)
-!     IF(ALLOCATED(AFI3)) DEALLOCATE (AFI3)
-     
-     !IF(ALLOCATED(ANL1)) DEALLOCATE (ANL1)
-     !IF(ALLOCATED(ANL2)) DEALLOCATE (ANL2)
-     !IF(ALLOCATED(ANL3)) DEALLOCATE (ANL3)
-     
-     !IF(ALLOCATED(APL1)) DEALLOCATE (APL1)    
-     !IF(ALLOCATED(APL2)) DEALLOCATE (APL2)
-     !IF(ALLOCATED(APL3)) DEALLOCATE (APL3)
-     
-
-     !IF(ALLOCATED(ASL1)) DEALLOCATE (ASL1)
-     !IF(ALLOCATED(ASL2)) DEALLOCATE (ASL2)     
-     !IF(ALLOCATED(ASL3)) DEALLOCATE (ASL3)
-
-     !IF(ALLOCATED(ACCHL1)) DEALLOCATE (ACCHL1)
-     !IF(ALLOCATED(ACCHL2)) DEALLOCATE (ACCHL2)
-     !IF(ALLOCATED(ACCHL3)) DEALLOCATE (ACCHL3)
-     
-     !IF(ALLOCATED(ANPP)) DEALLOCATE (ANPP)
-     !IF(ALLOCATED(ARESP)) DEALLOCATE (ARESP)
-     !IF(ALLOCATED(AKE)) DEALLOCATE (AKE)
-
-     !IF(ALLOCATED(AGPP)) DEALLOCATE (AGPP)
-
-     !IF(ALLOCATED(ABENDOC)) DEALLOCATE (ABENDOC)
-     !IF(ALLOCATED(ABENNH4)) DEALLOCATE (ABENNH4)
-     !IF(ALLOCATED(ABENNO3)) DEALLOCATE (ABENNO3)
-     !IF(ALLOCATED(ABENPO4)) DEALLOCATE (ABENPO4)
-     !IF(ALLOCATED(ABENCOD)) DEALLOCATE (ABENCOD)
-     !IF(ALLOCATED(ABENDO)) DEALLOCATE (ABENDO)
-     !IF(ALLOCATED(ABENSA)) DEALLOCATE (ABENSA)
-     
-     !IF(ALLOCATED(ASSFWS)) DEALLOCATE (ASSFWS)
-     !IF(ALLOCATED(APCFWS)) DEALLOCATE (APCFWS)
-     !IF(ALLOCATED(APNFWS)) DEALLOCATE (APNFWS)
-     !IF(ALLOCATED(APPFWS)) DEALLOCATE (APPFWS)
-     !IF(ALLOCATED(APSFWS)) DEALLOCATE (APSFWS)
-     !IF(ALLOCATED(ACPIP)) DEALLOCATE (ACPIP)
-     !IF(ALLOCATED(ACPOS)) DEALLOCATE (ACPOS)
-     
-     !IF(ALLOCATED(ADFEED)) DEALLOCATE (ADFEED)
-     !IF(ALLOCATED(ABENCH4G)) DEALLOCATE (ABENCH4G)
-     !IF(ALLOCATED(ABENCH4A)) DEALLOCATE (ABENCH4A)
-     
-     !IF(ALLOCATED(AFIB)) DEALLOCATE (AFIB)
-     !IF(ALLOCATED(ANLB)) DEALLOCATE (ANLB)
-     !IF(ALLOCATED(APLB)) DEALLOCATE (APLB)
- 
-     !IF(ALLOCATED(ANPPB)) DEALLOCATE (ANPPB)
-     
-     !IF(ALLOCATED(ABBM)) DEALLOCATE (ABBM)
-     !IF(ALLOCATED(ABLITE)) DEALLOCATE (ABLITE)
-     !IF(ALLOCATED(ABMB)) DEALLOCATE (ABMB)
-     !IF(ALLOCATED(APB)) DEALLOCATE (APB)
-     !IF(ALLOCATED(APRB)) DEALLOCATE (APRB)
-     
- 
-     !IF(ALLOCATED(ABADOC)) DEALLOCATE (ABADOC)
-     !IF(ALLOCATED(ABAPOC)) DEALLOCATE (ABAPOC)
-     !IF(ALLOCATED(ABANH4)) DEALLOCATE (ABANH4)
-     !IF(ALLOCATED(ABANO3)) DEALLOCATE (ABANO3)
-     !IF(ALLOCATED(ABAPON)) DEALLOCATE (ABAPON)
-     !IF(ALLOCATED(ABAPO4)) DEALLOCATE (ABAPO4)
-     !IF(ALLOCATED(ABAPOP)) DEALLOCATE (ABAPOP)
-     !IF(ALLOCATED(ABADO)) DEALLOCATE (ABADO)
-     
-     !IF(ALLOCATED(ACPOC)) DEALLOCATE (ACPOC)
-     !IF(ALLOCATED(ACPON)) DEALLOCATE (ACPON)
-     !IF(ALLOCATED(ACPOP)) DEALLOCATE (ACPOP)
-     
-     !suspension feeders
-     !IF(ALLOCATED(ASFEED)) DEALLOCATE (ASFEED)
-     !IF(ALLOCATED(AJNSF)) DEALLOCATE (AJNSF)
-     !IF(ALLOCATED(AJPSF)) DEALLOCATE (AJPSF)
-     !IF(ALLOCATED(ASODSF)) DEALLOCATE (ASODSF)
-     !IF(ALLOCATED(ASASF)) DEALLOCATE (ASASF)
-     !IF(ALLOCATED(ASUSF)) DEALLOCATE (ASUSF)
-     
-     !IF(ALLOCATED(ASFGCIN)) DEALLOCATE (ASFGCIN)
-     !IF(ALLOCATED(ASFCFEC)) DEALLOCATE (ASFCFEC)
-     !IF(ALLOCATED(ASFCPSF)) DEALLOCATE (ASFCPSF)
-     
-     !IF(ALLOCATED(AFLXCSF)) DEALLOCATE (AFLXCSF)
-     !IF(ALLOCATED(AFLXNSF)) DEALLOCATE (AFLXNSF)
-     !IF(ALLOCATED(AFLXPSF)) DEALLOCATE (AFLXPSF)
-     
-     !IF(ALLOCATED(ARPOCSF)) DEALLOCATE (ARPOCSF)
-     !IF(ALLOCATED(ARPONSF)) DEALLOCATE (ARPONSF)
-     !IF(ALLOCATED(ARPOPSF)) DEALLOCATE (ARPOPSF)
-     
-     !IF(ALLOCATED(ASSISF)) DEALLOCATE (ASSISF)
-     !IF(ALLOCATED(ASSISASF)) DEALLOCATE (ASSISASF)
-     !IF(ALLOCATED(ASSISUSF)) DEALLOCATE (ASSISUSF)
-     !IF(ALLOCATED(ASSIPSF)) DEALLOCATE (ASSIPSF)
-     
-     !IF(ALLOCATED(A_T)) DEALLOCATE (A_T)
-     !IF(ALLOCATED(AP1)) DEALLOCATE (AP1)
-     !IF(ALLOCATED(ABM1)) DEALLOCATE (ABM1)
-     !IF(ALLOCATED(APR1)) DEALLOCATE (APR1)
-     !IF(ALLOCATED(AP2)) DEALLOCATE (AP2)
-     !IF(ALLOCATED(ABM2)) DEALLOCATE (ABM2)
-     !IF(ALLOCATED(APR2)) DEALLOCATE (APR2)
-     !IF(ALLOCATED(AP3)) DEALLOCATE (AP3)
-     !IF(ALLOCATED(ABM3)) DEALLOCATE (ABM3)
-     !IF(ALLOCATED(APR3)) DEALLOCATE (APR3)
-     
-     !IF(ALLOCATED(AALGDOC)) DEALLOCATE (AALGDOC)
-     !IF(ALLOCATED(AALGPOC)) DEALLOCATE (AALGPOC)
-     !IF(ALLOCATED(ADENIT)) DEALLOCATE (ADENIT)
-     !IF(ALLOCATED(AMNLDOC)) DEALLOCATE (AMNLDOC)
-     !IF(ALLOCATED(AHDRPOC)) DEALLOCATE (AHDRPOC)
-     !IF(ALLOCATED(AALGNH4)) DEALLOCATE (AALGNH4)
-     !IF(ALLOCATED(AALGNO3)) DEALLOCATE (AALGNO3)
-     !IF(ALLOCATED(AALGDON)) DEALLOCATE (AALGDON)
-     !IF(ALLOCATED(AALGPON)) DEALLOCATE (AALGPON)
-     !IF(ALLOCATED(ANT)) DEALLOCATE (ANT)
-     !IF(ALLOCATED(ADENNO3)) DEALLOCATE (ADENNO3)
-     !IF(ALLOCATED(AMNLDON)) DEALLOCATE (AMNLDON)
-     !IF(ALLOCATED(AHDRPON)) DEALLOCATE (AHDRPON)
-     
-     !IF(ALLOCATED(ACFIX)) DEALLOCATE (ACFIX)
-     !IF(ALLOCATED(ANFIX)) DEALLOCATE (ANFIX)
-
-     !IF(ALLOCATED(AALGPO4)) DEALLOCATE (AALGPO4)
-     !IF(ALLOCATED(AALGDOP)) DEALLOCATE (AALGDOP)
-     !IF(ALLOCATED(AALGPOP)) DEALLOCATE (AALGPOP)
-     !IF(ALLOCATED(AMNLDOP)) DEALLOCATE (AMNLDOP)
-     !IF(ALLOCATED(AHDRPOP)) DEALLOCATE (AHDRPOP)
-     
-     
-     !IF(ALLOCATED(APSD)) DEALLOCATE (APSD)
-     !IF(ALLOCATED(ASAP)) DEALLOCATE (ASAP)
-     !IF(ALLOCATED(AALGUP)) DEALLOCATE (AALGUP)
-     !IF(ALLOCATED(AALGRES)) DEALLOCATE (AALGRES)
-     
-     !IF(ALLOCATED(ADO)) DEALLOCATE (ADO)
-     !IF(ALLOCATED(ADORALG)) DEALLOCATE (ADORALG)
-     !IF(ALLOCATED(ADOPR)) DEALLOCATE (ADOPR)
-     
-     !IF(ALLOCATED(ADCOD)) DEALLOCATE (ADCOD)
-     !IF(ALLOCATED(ADDOC)) DEALLOCATE (ADDOC)
-     !IF(ALLOCATED(ANITRIF)) DEALLOCATE (ANITRIF)
-
-     !IF(ALLOCATED(V1SINGLE)) DEALLOCATE (V1SINGLE)
-
-     !IF(ALLOCATED(SBN)) DEALLOCATE (SBN)
-     !IF(ALLOCATED(BBN)) DEALLOCATE (BBN)
-     !IF(ALLOCATED(HMSBV)) DEALLOCATE (HMSBV)
-!!Wen Long     IF(ALLOCATED(SFA)) DEALLOCATE (SFA)  !Wen Long deprecated SFA, replaced by ART1
- 
-!     IF(ALLOCATED(IWCMNB)) DEALLOCATE (IWCMNB)
-!     IF(ALLOCATED(IWCMPB)) DEALLOCATE (IWCMPB)
-!     IF(ALLOCATED(IWCMCB)) DEALLOCATE (IWCMCB)
-!     IF(ALLOCATED(IWCMSB)) DEALLOCATE (IWCMSB)
-     
-!     IF(ALLOCATED(WCMNB)) DEALLOCATE (WCMNB)
-!     IF(ALLOCATED(WCMPB)) DEALLOCATE (WCMPB)
-!     IF(ALLOCATED(WCMCB)) DEALLOCATE (WCMCB)
-!     IF(ALLOCATED(WCMSB)) DEALLOCATE (WCMSB)
-     
-!     IF(ALLOCATED(DLWCMNB)) DEALLOCATE (DLWCMNB)
-!     IF(ALLOCATED(DLWCMPB)) DEALLOCATE (DLWCMPB)
-!     IF(ALLOCATED(DLWCKMNB)) DEALLOCATE (DLWCKMNB)
-!     IF(ALLOCATED(DLWCKMCB)) DEALLOCATE (DLWCKMCB)
-    
-!     IF(ALLOCATED(FLUXS)) DEALLOCATE (FLUXS)
-     
-     !IF(ALLOCATED(S1FLXNB)) DEALLOCATE (S1FLXNB)
-     !IF(ALLOCATED(S1FLXPB)) DEALLOCATE (S1FLXPB)
-     !IF(ALLOCATED(S1FLXCB)) DEALLOCATE (S1FLXCB)
-     !IF(ALLOCATED(S2FLXNB)) DEALLOCATE (S2FLXNB)
-     !IF(ALLOCATED(S2FLXPB)) DEALLOCATE (S2FLXPB)
-     !IF(ALLOCATED(S2FLXCB)) DEALLOCATE (S2FLXCB)
-     !IF(ALLOCATED(S3FLXNB)) DEALLOCATE (S3FLXNB)
-     !IF(ALLOCATED(S3FLXPB)) DEALLOCATE (S3FLXPB)
-     !IF(ALLOCATED(S3FLXCB)) DEALLOCATE (S3FLXCB)
-     
-     !IF(ALLOCATED(CPOC)) DEALLOCATE (CPOC)
-     !IF(ALLOCATED(CPON)) DEALLOCATE (CPON)
-     !IF(ALLOCATED(CPOP)) DEALLOCATE (CPOP)
-     
-     !IF(ALLOCATED(JPOC)) DEALLOCATE (JPOC)
-     !IF(ALLOCATED(JPON)) DEALLOCATE (JPON)
-     !IF(ALLOCATED(JPOP)) DEALLOCATE (JPOP)
-     !IF(ALLOCATED(JPOS)) DEALLOCATE (JPOS)
-     
-     !IF(ALLOCATED(CPOS)) DEALLOCATE (CPOS)
-     !IF(ALLOCATED(CPO4)) DEALLOCATE (CPO4)
-     !IF(ALLOCATED(CNO3)) DEALLOCATE (CNO3)
-     !IF(ALLOCATED(CNH4)) DEALLOCATE (CNH4)
-     
-     !IF(ALLOCATED(CTEMP)) DEALLOCATE (CTEMP)
-
-     !IF(ALLOCATED(BSVOL)) DEALLOCATE (BSVOL)
-     !IF(ALLOCATED(HSED)) DEALLOCATE (HSED)  !moved to mod_sed.F
-     !IF(ALLOCATED(CCH4)) DEALLOCATE (CCH4)
-     !IF(ALLOCATED(CSO4)) DEALLOCATE (CSO4)
-     !IF(ALLOCATED(CHS)) DEALLOCATE (CHS)
-     !IF(ALLOCATED(CSI)) DEALLOCATE (CSI)
-     
-
-     !IF(ALLOCATED(PPFWS)) DEALLOCATE (PPFWS)
-     !IF(ALLOCATED(PNFWS)) DEALLOCATE (PNFWS)
-     !IF(ALLOCATED(PCFWS)) DEALLOCATE (PCFWS)
-     !IF(ALLOCATED(PSFWS)) DEALLOCATE (PSFWS)
-     !IF(ALLOCATED(SSFWS)) DEALLOCATE (SSFWS)
-   
- 
-     !IF(ALLOCATED(AASRAT)) DEALLOCATE (AASRAT)
-
-
-    !benthic flux to water colum due to sediment     
-
-     !IF(ALLOCATED(BENDOCB)) DEALLOCATE (BENDOCB)
-     !IF(ALLOCATED(BENNH4B)) DEALLOCATE (BENNH4B)
-     !IF(ALLOCATED(BENNO3B)) DEALLOCATE (BENNO3B)
-     !IF(ALLOCATED(BENPO4B)) DEALLOCATE (BENPO4B)
-     !IF(ALLOCATED(BENCODB)) DEALLOCATE (BENCODB)
-     !IF(ALLOCATED(BENDOB)) DEALLOCATE (BENDOB)
-     !IF(ALLOCATED(BENSAB)) DEALLOCATE (BENSAB)
-     
-     !IF(ALLOCATED(ATMFLXNB)) DEALLOCATE (ATMFLXNB)
-     !IF(ALLOCATED(ATMFLXPB)) DEALLOCATE (ATMFLXPB)
-     !IF(ALLOCATED(ATMFLXCB)) DEALLOCATE (ATMFLXCB)
-     
-     !IF(ALLOCATED(BENFLXPCB)) DEALLOCATE (BENFLXPCB)     
-     !IF(ALLOCATED(BENFLXPNB)) DEALLOCATE (BENFLXPNB)
-     !IF(ALLOCATED(BENFLXDNB)) DEALLOCATE (BENFLXDNB)
-     !IF(ALLOCATED(BENFLXPPB)) DEALLOCATE (BENFLXPPB)
-     !IF(ALLOCATED(BENFLXDPB)) DEALLOCATE (BENFLXDPB)
-
-     
-     !IF(ALLOCATED(DLSEDKNB)) DEALLOCATE (DLSEDKNB)
-     !IF(ALLOCATED(DLSEDKCB)) DEALLOCATE (DLSEDKCB)
-     
-     !IF(ALLOCATED(BURIALFLXNB)) DEALLOCATE (BURIALFLXNB)
-     !IF(ALLOCATED(BURIALFLXPB)) DEALLOCATE (BURIALFLXPB)
-     !IF(ALLOCATED(BURIALFLXCB)) DEALLOCATE (BURIALFLXCB)
-     !     
-     
-     !    IF(ALLOCATED(C2_GL)) DEALLOCATE (C2_GL)
-!    IF(ALLOCATED(CCHL1_GL))        DEALLOCATE(CCHL1_GL)
-!    IF(ALLOCATED(T_GL))            DEALLOCATE(T_GL)
-!    IF(ALLOCATED(S_GL))            DEALLOCATE(S_GL)
-!    IF(ALLOCATED(total_netPP_GL))  DEALLOCATE(total_netPP_GL)
-     
-!Wen Long added D_GL, EL_GL, H_GL (total depth, surface elevation and bathymetric depth)
-    !IF(ALLOCATED(D_GL))            DEALLOCATE(D_GL)
-    !IF(ALLOCATED(H_GL))            DEALLOCATE(H_GL)
-    !IF(ALLOCATED(EL_GL))           DEALLOCATE(EL_GL)
-
-!--Wen Long debugging benthic fluxes ---
-    !IF(ALLOCATED(BFLUX))           DEALLOCATE(BFLUX)
-    !IF(ALLOCATED(BFLUX_GL))        DEALLOCATE(BFLUX_GL)
-    !IF(ALLOCATED(BFLUXB_GL))       DEALLOCATE(BFLUXB_GL)
-    !IF(ALLOCATED(BFLUXNX))         DEALLOCATE(BFLUXNX)
-    !IF(ALLOCATED(BFLUXNX_GL))      DEALLOCATE(BFLUXNX_GL)
-
-!--Wen Long, deallocate global hydrodynamics ---
-    !IF(ALLOCATED(UL_GL))           DEALLOCATE(UL_GL)
-    !IF(ALLOCATED(VL_GL))           DEALLOCATE(VL_GL)
-    !IF(ALLOCATED(WTSL_GL))         DEALLOCATE(WTSL_GL)
-    !IF(ALLOCATED(KHL_GL))          DEALLOCATE(KHL_GL)
-    !IF(ALLOCATED(SL_GL))           DEALLOCATE(SL_GL)
-    !IF(ALLOCATED(TL_GL))           DEALLOCATE(TL_GL)
-    !IF(ALLOCATED(ELL_GL))          DEALLOCATE(ELL_GL)
-    !IF(ALLOCATED(DTFAL_GL))        DEALLOCATE(DTFAL_GL)
-    !IF(ALLOCATED(UARD_OBCN_GL))    DEALLOCATE(UARD_OBCN_GL)
-    !IF(ALLOCATED(XFLUX_OBC_GL))    DEALLOCATE(XFLUX_OBC_GL)
-
-
-!-- Wen Long, debugging algae 1 and 2 growth, respiration, mortality and predation
-   !IF(ALLOCATED(P1_GL))             DEALLOCATE(P1_GL)
-   !IF(ALLOCATED(P2_GL))             DEALLOCATE(P2_GL)
-   !IF(ALLOCATED(BM1_GL))            DEALLOCATE(BM1_GL)
-   !IF(ALLOCATED(BM2_GL))            DEALLOCATE(BM2_GL)
-   !IF(ALLOCATED(NL1_GL))            DEALLOCATE(NL1_GL)
-   !IF(ALLOCATED(NL2_GL))            DEALLOCATE(NL2_GL)
-   !IF(ALLOCATED(PL1_GL))            DEALLOCATE(PL1_GL)
-   !IF(ALLOCATED(PL2_GL))            DEALLOCATE(PL2_GL)
-
-   !IF(ALLOCATED(B1SZ_GL))           DEALLOCATE(B1SZ_GL)
-   !IF(ALLOCATED(B2SZ_GL))           DEALLOCATE(B2SZ_GL)
-   !IF(ALLOCATED(B1LZ_GL))           DEALLOCATE(B1LZ_GL)
-   !IF(ALLOCATED(B2LZ_GL))           DEALLOCATE(B2LZ_GL)
-   !IF(ALLOCATED(PR1_GL))            DEALLOCATE(PR1_GL)
-   !IF(ALLOCATED(PR2_GL))            DEALLOCATE(PR2_GL)
-     
-   !IF(LIGHT_EXTINCTION)THEN
-!        IF(ALLOCATED(IAVG_GL))           DEALLOCATE(IAVG_GL)
-!        IF(ALLOCATED(FI1_GL))            DEALLOCATE(FI1_GL)
-!        IF(ALLOCATED(FI2_GL))            DEALLOCATE(FI2_GL)
-   !ENDIF
-   
-   !IF(ALLOCATED(IK1_GL))            DEALLOCATE(IK1_GL)
-   !IF(ALLOCATED(IK2_GL))            DEALLOCATE(IK2_GL)
-   !IF(ALLOCATED(IK1))               DEALLOCATE(IK1)
-   !IF(ALLOCATED(IK2))               DEALLOCATE(IK2)
-
-!!-- Wen Long, debuging DOXG and COD 
-!   IF(ALLOCATED(DDOC_GL))  DEALLOCATE(DDOC_GL)
-!   IF(ALLOCATED(DCOD_GL))  DEALLOCATE(DCOD_GL)
-!   IF(ALLOCATED(NITRIF_GL))DEALLOCATE(NITRIF_GL)
-!   IF(ALLOCATED(DOSZ_GL))  DEALLOCATE(DOSZ_GL)
-!   IF(ALLOCATED(DOLZ_GL))  DEALLOCATE(DOLZ_GL)
-!   IF(ALLOCATED(DOPR_GL))  DEALLOCATE(DOPR_GL)
-!   IF(ALLOCATED(DORALG_GL))DEALLOCATE(DORALG_GL)
-!   IF(ALLOCATED(RESP_GL))  DEALLOCATE(RESP_GL)
-!   IF(ALLOCATED(FTCOD_GL)) DEALLOCATE(FTCOD_GL)
-!   IF(ALLOCATED(COD_GL))   DEALLOCATE(COD_GL)
-!   IF(ALLOCATED(REAERDO_GL))   DEALLOCATE(REAERDO_GL)
-!   IF(ALLOCATED(REAERDO))   DEALLOCATE(REAERDO)
-
 !!---Wen Long deallocate buffers
 #if defined (MULTIPROCESSOR)
 !   IF(ALLOCATED(SNDBUF))DEALLOCATE(SNDBUF)
@@ -5219,263 +3679,14 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 #endif
    
      CALL  WQM_DEALLOC !WLong repaced the above section by WQM_DEALLOC
-     
-     !WLong moved to wqm_sed.F SED_DEALLOC
-     !IF(ALLOCATED(VSED)) DEALLOCATE (VSED)
-     !IF(ALLOCATED(VPMIX)) DEALLOCATE (VPMIX)
-     !IF(ALLOCATED(VDMIX)) DEALLOCATE (VDMIX)      
-     
-    !WLong moved thhese to mod_zoop.F
-     
-     !IF(ALLOCATED(B1SZ)) DEALLOCATE (B1SZ)
-     !IF(ALLOCATED(B2SZ)) DEALLOCATE (B2SZ)
-     !IF(ALLOCATED(B3SZ)) DEALLOCATE (B3SZ)
-     !IF(ALLOCATED(B1LZ)) DEALLOCATE (B1LZ)
-     !IF(ALLOCATED(B2LZ)) DEALLOCATE (B2LZ)
-     !IF(ALLOCATED(B3LZ)) DEALLOCATE (B3LZ)
-     !IF(ALLOCATED(DOSZ)) DEALLOCATE (DOSZ)
-     !IF(ALLOCATED(DOLZ)) DEALLOCATE (DOLZ)
-     !IF(ALLOCATED(SASZ)) DEALLOCATE (SASZ)
-     !IF(ALLOCATED(SUSZ)) DEALLOCATE (SUSZ)
-     !IF(ALLOCATED(SALZ)) DEALLOCATE (SALZ)
-     !IF(ALLOCATED(SULZ)) DEALLOCATE (SULZ)
 
-     
- 
-     !WLong moved this to mod_zoop.F
-     
-     !IF(ALLOCATED(B1ASZ)) DEALLOCATE (B1ASZ)
-     !IF(ALLOCATED(B2ASZ)) DEALLOCATE (B2ASZ)
-     !IF(ALLOCATED(B3ASZ)) DEALLOCATE (B3ASZ)
-     !IF(ALLOCATED(LPOCASZ)) DEALLOCATE (LPOCASZ)
-     !IF(ALLOCATED(RPOCASZ)) DEALLOCATE (RPOCASZ)
-     !IF(ALLOCATED(PRASZ)) DEALLOCATE (PRASZ)
-     !IF(ALLOCATED(B1ALZ)) DEALLOCATE (B1ALZ)
-     !IF(ALLOCATED(B2ALZ)) DEALLOCATE (B2ALZ)
-     !IF(ALLOCATED(B3ALZ)) DEALLOCATE (B3ALZ)
-     !IF(ALLOCATED(SZALZ)) DEALLOCATE (SZALZ)
-     !IF(ALLOCATED(LPOCALZ)) DEALLOCATE (LPOCALZ)
-     !IF(ALLOCATED(RPOCALZ)) DEALLOCATE (RPOCALZ)
-     !IF(ALLOCATED(PRALZ)) DEALLOCATE (PRALZ)
-     !IF(ALLOCATED(CLSZ)) DEALLOCATE (CLSZ)
-     !IF(ALLOCATED(CLLZ)) DEALLOCATE (CLLZ)
-     !IF(ALLOCATED(RSZ)) DEALLOCATE (RSZ)
-     !IF(ALLOCATED(RLZ)) DEALLOCATE (RLZ)
-     !IF(ALLOCATED(RMAXSZ)) DEALLOCATE (RMAXSZ)
-     !IF(ALLOCATED(RMAXLZ)) DEALLOCATE (RMAXLZ)
-     !IF(ALLOCATED(BMSZ)) DEALLOCATE (BMSZ)
-     !IF(ALLOCATED(BMLZ)) DEALLOCATE (BMLZ)
-     !IF(ALLOCATED(BMRSZ)) DEALLOCATE (BMRSZ)
-     !IF(ALLOCATED(BMRLZ)) DEALLOCATE (BMRLZ)
-     !IF(ALLOCATED(MSZ)) DEALLOCATE (MSZ)
-     !IF(ALLOCATED(MLZ)) DEALLOCATE (MLZ)
-     !IF(ALLOCATED(PRSZLZ)) DEALLOCATE (PRSZLZ)
-     !IF(ALLOCATED(GSZ)) DEALLOCATE (GSZ)
-     !IF(ALLOCATED(GLZ)) DEALLOCATE (GLZ)
-     !IF(ALLOCATED(ESZ)) DEALLOCATE (ESZ)
-     !IF(ALLOCATED(ELZ)) DEALLOCATE (ELZ)
-     !IF(ALLOCATED(RFSZ)) DEALLOCATE (RFSZ)
-     !IF(ALLOCATED(RFLZ)) DEALLOCATE (RFLZ)
-     !IF(ALLOCATED(PRSZ)) DEALLOCATE (PRSZ)
-     !IF(ALLOCATED(PRLZ)) DEALLOCATE (PRLZ)
-     !IF(ALLOCATED(LDOCASZ)) DEALLOCATE (LDOCASZ)
-     !IF(ALLOCATED(BPRSZ)) DEALLOCATE (BPRSZ)
-     !IF(ALLOCATED(BPRLZ)) DEALLOCATE (BPRLZ)
-     !IF(ALLOCATED(RDOCASZ)) DEALLOCATE (RDOCASZ)
-     !IF(ALLOCATED(LDOCSZ)) DEALLOCATE (LDOCSZ)
-     !IF(ALLOCATED(LPOCSZ)) DEALLOCATE (LPOCSZ)
-     !IF(ALLOCATED(RPOCSZ)) DEALLOCATE (RPOCSZ)
-     !IF(ALLOCATED(LDOCLZ)) DEALLOCATE (LDOCLZ)
-     !IF(ALLOCATED(LPOCLZ)) DEALLOCATE (LPOCLZ)
-     !IF(ALLOCATED(RPOCLZ)) DEALLOCATE (RPOCLZ)
-     !IF(ALLOCATED(NH4SZ)) DEALLOCATE (NH4SZ)
-     !IF(ALLOCATED(LDONSZ)) DEALLOCATE (LDONSZ)
-     !IF(ALLOCATED(LPONSZ)) DEALLOCATE (LPONSZ)
-     !IF(ALLOCATED(RPONSZ)) DEALLOCATE (RPONSZ)
-     !IF(ALLOCATED(NH4LZ)) DEALLOCATE (NH4LZ)
-     !IF(ALLOCATED(LDONLZ)) DEALLOCATE (LDONLZ)
-     !IF(ALLOCATED(LPONLZ)) DEALLOCATE (LPONLZ)
-     !IF(ALLOCATED(RPONLZ)) DEALLOCATE (RPONLZ)
-     !IF(ALLOCATED(PO4SZ)) DEALLOCATE (PO4SZ)
-     !IF(ALLOCATED(LDOPSZ)) DEALLOCATE (LDOPSZ)
-     !IF(ALLOCATED(LPOPSZ)) DEALLOCATE (LPOPSZ)
-     !IF(ALLOCATED(RPOPSZ)) DEALLOCATE (RPOPSZ)
-     !IF(ALLOCATED(PO4LZ)) DEALLOCATE (PO4LZ)
-     !IF(ALLOCATED(LDOPLZ)) DEALLOCATE (LDOPLZ)
-     !IF(ALLOCATED(LPOPLZ)) DEALLOCATE (LPOPLZ)
-     !IF(ALLOCATED(RPOPLZ)) DEALLOCATE (RPOPLZ)
-     !IF(ALLOCATED(RDOCSZ)) DEALLOCATE (RDOCSZ)
-     !IF(ALLOCATED(RDONSZ)) DEALLOCATE (RDONSZ)
-     !IF(ALLOCATED(RDOPSZ)) DEALLOCATE (RDOPSZ)
-     !IF(ALLOCATED(RDOCLZ)) DEALLOCATE (RDOCLZ)
-     !IF(ALLOCATED(RDONLZ)) DEALLOCATE (RDONLZ)
-     !IF(ALLOCATED(RDOPLZ)) DEALLOCATE (RDOPLZ)
-     !IF(ALLOCATED(PIB1SZ)) DEALLOCATE (PIB1SZ)
-     !IF(ALLOCATED(PIB2SZ)) DEALLOCATE (PIB2SZ)
-     !IF(ALLOCATED(PIB3SZ)) DEALLOCATE (PIB3SZ)
-     !IF(ALLOCATED(PIB1LZ)) DEALLOCATE (PIB1LZ)
-     !IF(ALLOCATED(PIB2LZ)) DEALLOCATE (PIB2LZ)
-     !IF(ALLOCATED(PIB3LZ)) DEALLOCATE (PIB3LZ)
-     
+# if defined(XFLUX_FLAG)     
+     CALL DEALLOC_EDGELINE_FLUX
+# endif
+    
      CALL ZOOP_DEALLOC !WLong replaced the above by ZOOP_DEALLOC()
-
-
-     !Wllong moved thiese to mod_owq.F and replaced by OWQ_DEALLOC()
-     !IF(ALLOCATED(COLOR)) DEALLOCATE (COLOR)
-     !IF(ALLOCATED(TURB)) DEALLOCATE (TURB)
-     !IF(ALLOCATED(IAVG)) DEALLOCATE (IAVG)    !WLong moved this to mod_owq.F
-     !IF(ALLOCATED(IATBOT)) DEALLOCATE (IATBOT)!WLong moved this to mod_owq.F
-     !IF(ALLOCATED(KESS)) DEALLOCATE (KESS)  !WLong moved this to mod_owq.F
      IF(LIGHT_EXTINCTION)CALL OWQ_DEALLOC    !WLong replace the above with OWQ_DEALLOC
-      
-     
-     !WLong moved these to wqm_sed.F subroutine SED_DEALLOC
-     !IF(ALLOCATED(PON1TM1S)) DEALLOCATE (PON1TM1S)
-     !IF(ALLOCATED(PON2TM1S)) DEALLOCATE (PON2TM1S)
-     !IF(ALLOCATED(PON3TM1S)) DEALLOCATE (PON3TM1S)
-     !IF(ALLOCATED(POC1TM1S)) DEALLOCATE (POC1TM1S)
-     !IF(ALLOCATED(POC2TM1S)) DEALLOCATE (POC2TM1S)
-     !IF(ALLOCATED(POC3TM1S)) DEALLOCATE (POC3TM1S)
-     !IF(ALLOCATED(POP1TM1S)) DEALLOCATE (POP1TM1S)
-     !IF(ALLOCATED(POP2TM1S)) DEALLOCATE (POP2TM1S)
-     !IF(ALLOCATED(POP3TM1S)) DEALLOCATE (POP3TM1S)
-     !IF(ALLOCATED(PSISEDTM1S)) DEALLOCATE (PSISEDTM1S)
-    
-     !WLong moved these to wqm_sed.F subroutine SED_DEALLOC
-     !IF(ALLOCATED(BENSTRTM1S)) DEALLOCATE (BENSTRTM1S)
-     !IF(ALLOCATED(BFORMAXS)) DEALLOCATE (BFORMAXS)
-     !IF(ALLOCATED(ISWBENS)) DEALLOCATE (ISWBENS)
-
-
-     !WLong moved this to mod_zoop.F
-     !IF(ALLOCATED(ACLSZ)) DEALLOCATE (ACLSZ)
-     !IF(ALLOCATED(ACLLZ)) DEALLOCATE (ACLLZ)
-     !IF(ALLOCATED(ARSZ)) DEALLOCATE (ARSZ)
-     !IF(ALLOCATED(ARLZ)) DEALLOCATE (ARLZ)
-     !IF(ALLOCATED(ABMSZ)) DEALLOCATE (ABMSZ)
-     !IF(ALLOCATED(ABMLZ)) DEALLOCATE (ABMLZ)
-     !IF(ALLOCATED(AMSZ)) DEALLOCATE (AMSZ)
-     !IF(ALLOCATED(AMLZ)) DEALLOCATE (AMLZ)
-     !IF(ALLOCATED(APRSZLZ)) DEALLOCATE (APRSZLZ)
-     !IF(ALLOCATED(AGSZ)) DEALLOCATE (AGSZ)
-     !IF(ALLOCATED(AGLZ)) DEALLOCATE (AGLZ)
-     !IF(ALLOCATED(ADOCSZ)) DEALLOCATE (ADOCSZ)
-     !IF(ALLOCATED(APOCSZ)) DEALLOCATE (APOCSZ)
-     !IF(ALLOCATED(ADOCLZ)) DEALLOCATE (ADOCLZ)
-     !IF(ALLOCATED(APOCLZ)) DEALLOCATE (APOCLZ)
-     !IF(ALLOCATED(ANH4SZ)) DEALLOCATE (ANH4SZ)
-     !IF(ALLOCATED(ADONSZ)) DEALLOCATE (ADONSZ)
-     !IF(ALLOCATED(APONSZ)) DEALLOCATE (APONSZ)
-     !IF(ALLOCATED(ANH4LZ)) DEALLOCATE (ANH4LZ)
-     !IF(ALLOCATED(ADONLZ)) DEALLOCATE (ADONLZ)
-     !IF(ALLOCATED(APONLZ)) DEALLOCATE (APONLZ)
-     !IF(ALLOCATED(APO4SZ)) DEALLOCATE (APO4SZ)
-     !IF(ALLOCATED(ADOPSZ)) DEALLOCATE (ADOPSZ)
-     !IF(ALLOCATED(APOPSZ)) DEALLOCATE (APOPSZ)
-     !IF(ALLOCATED(APO4LZ)) DEALLOCATE (APO4LZ)
-     !IF(ALLOCATED(ADOPLZ)) DEALLOCATE (ADOPLZ)
-     !IF(ALLOCATED(APOPLZ)) DEALLOCATE (APOPLZ)
-     !IF(ALLOCATED(APRSZ)) DEALLOCATE (APRSZ)
-     !IF(ALLOCATED(APRLZ)) DEALLOCATE (APRLZ)
-     !IF(ALLOCATED(APISZ)) DEALLOCATE (APISZ)
-     !IF(ALLOCATED(APILZ)) DEALLOCATE (APILZ)
-     !IF(ALLOCATED(AB1SZ)) DEALLOCATE (AB1SZ)
-     !IF(ALLOCATED(AB2SZ)) DEALLOCATE (AB2SZ)
-     !IF(ALLOCATED(AB3SZ)) DEALLOCATE (AB3SZ)
-     !IF(ALLOCATED(AB1LZ)) DEALLOCATE (AB1LZ)
-     !IF(ALLOCATED(AB2LZ)) DEALLOCATE (AB2LZ)
-     !IF(ALLOCATED(AB3LZ)) DEALLOCATE (AB3LZ)
-     !IF(ALLOCATED(ADOSZ)) DEALLOCATE (ADOSZ)
-     !IF(ALLOCATED(ADOLZ)) DEALLOCATE (ADOLZ)
-     !IF(ALLOCATED(ASASZ)) DEALLOCATE (ASASZ)
-     !IF(ALLOCATED(ASUSZ)) DEALLOCATE (ASUSZ)
-     !IF(ALLOCATED(ASALZ)) DEALLOCATE (ASALZ)
-     !IF(ALLOCATED(ASULZ)) DEALLOCATE (ASULZ)
-     
-  
-     !WLong moved the following to wqm_sed.F SED_DEALLOC
-     !IF(ALLOCATED(WSSBNET)) DEALLOCATE (WSSBNET)
-     !IF(ALLOCATED(WSLBNET)) DEALLOCATE (WSLBNET)
-     !IF(ALLOCATED(WSRBNET)) DEALLOCATE (WSRBNET)
-     !IF(ALLOCATED(WS1BNET)) DEALLOCATE (WS1BNET)
-     !IF(ALLOCATED(WS2BNET)) DEALLOCATE (WS2BNET)
-     !IF(ALLOCATED(WS3BNET)) DEALLOCATE (WS3BNET)
-     !IF(ALLOCATED(WSUBNET)) DEALLOCATE (WSUBNET)
-
-     !WLong moved the following to wqm_sed.F
-     !IF(ALLOCATED(FRPOP)) DEALLOCATE (FRPOP)
-     !IF(ALLOCATED(FRPON)) DEALLOCATE (FRPON)
-     !IF(ALLOCATED(FRPOC)) DEALLOCATE (FRPOC)
-
-
-     !WLong moved these to wqm_sed.F subroutine SED_DEALLOC
-     !IF(ALLOCATED(NH41TM1S)) DEALLOCATE (NH41TM1S)
-     !IF(ALLOCATED(NH4T2TM1S)) DEALLOCATE (NH4T2TM1S)
-     !IF(ALLOCATED(NO31TM1S)) DEALLOCATE (NO31TM1S)
-     !IF(ALLOCATED(NO3T2TM1S)) DEALLOCATE (NO3T2TM1S)
-     !IF(ALLOCATED(HS1TM1S)) DEALLOCATE (HS1TM1S)
-     !IF(ALLOCATED(HST2TM1S)) DEALLOCATE (HST2TM1S)
-     !IF(ALLOCATED(SI1TM1S)) DEALLOCATE (SI1TM1S)
-     !IF(ALLOCATED(SIT2TM1S)) DEALLOCATE (SIT2TM1S)
-     !IF(ALLOCATED(PO41TM1S)) DEALLOCATE (PO41TM1S)
-     !IF(ALLOCATED(PO4T2TM1S)) DEALLOCATE (PO4T2TM1S)
-
-     !WLong moved these to wqm_sed.F subroutine SED_DEALLOC
-     !IF(ALLOCATED(AG3CFL)) DEALLOCATE (AG3CFL)
-     !IF(ALLOCATED(AG3NFL)) DEALLOCATE (AG3NFL)
-     !IF(ALLOCATED(AG3PFL)) DEALLOCATE (AG3PFL)
-     !IF(ALLOCATED(ASDTMP)) DEALLOCATE (ASDTMP)
-
-     !WLong moved to wqm_sed.F SED_DEALLOC subroutine
-     !IF(ALLOCATED(CH4T2TM1S)) DEALLOCATE (CH4T2TM1S)
-     !IF(ALLOCATED(SO4T2TM1S)) DEALLOCATE (SO4T2TM1S)
-     !IF(ALLOCATED(CH41TM1S)) DEALLOCATE (CH41TM1S)
-     
-     !WLong moved to wqm_sed.F SED_DEALLOC subroutine
-     !IF(ALLOCATED(BURIALN)) DEALLOCATE (BURIALN)
-     !IF(ALLOCATED(BURIALP)) DEALLOCATE (BURIALP)
-     !IF(ALLOCATED(BURIALC)) DEALLOCATE (BURIALC)
-
-     !WLong moved to wqm_sed.F SED_DEALLOC subroutine
-     !IF(ALLOCATED(DIAGENC)) DEALLOCATE (DIAGENC)
-
-     !WLong moved to wqm_sed.F SED_DEALLOC subroutine
-     !IF(ALLOCATED(FIB)) DEALLOCATE (FIB)
-     !IF(ALLOCATED(NLB)) DEALLOCATE (NLB)
-     !IF(ALLOCATED(PLB)) DEALLOCATE (PLB)
-     !IF(ALLOCATED(NPPB)) DEALLOCATE (NPPB)
-     !IF(ALLOCATED(BBM)) DEALLOCATE (BBM)
-     !IF(ALLOCATED(BLITE)) DEALLOCATE (BLITE)
-     !IF(ALLOCATED(BMB)) DEALLOCATE (BMB)
-     !IF(ALLOCATED(PB)) DEALLOCATE (PB)
-     !IF(ALLOCATED(PRB)) DEALLOCATE (PRB)
-     !IF(ALLOCATED(BANH4)) DEALLOCATE (BANH4)
-     !IF(ALLOCATED(BANO3)) DEALLOCATE (BANO3)
-     !IF(ALLOCATED(BAPO4)) DEALLOCATE (BAPO4)
-     !IF(ALLOCATED(BADOC)) DEALLOCATE (BADOC)
-     !IF(ALLOCATED(BADO)) DEALLOCATE (BADO)
-     !IF(ALLOCATED(BAPOC)) DEALLOCATE (BAPOC)
-     !IF(ALLOCATED(BAPON)) DEALLOCATE (BAPON)
-     !IF(ALLOCATED(BAPOP)) DEALLOCATE (BAPOP)
-
-     !WLong moved the folowing to mod_df.F DF_DEALLOC()
-     !IF(ALLOCATED(DFEEDM1S)) DEALLOCATE (DFEEDM1S)
-     !IF(ALLOCATED(DF_GROW)) DEALLOCATE (DF_GROW)
-     !IF(ALLOCATED(DF_RESP)) DEALLOCATE (DF_RESP)
-     !IF(ALLOCATED(DF_PRED)) DEALLOCATE (DF_PRED)
-     !IF(ALLOCATED(DF_MORT)) DEALLOCATE (DF_MORT)
-     !IF(ALLOCATED(ADF_GROW)) DEALLOCATE (ADF_GROW)
-     !IF(ALLOCATED(ADF_RESP)) DEALLOCATE (ADF_RESP)
-     !IF(ALLOCATED(ADF_PRED)) DEALLOCATE (ADF_PRED)
-     !IF(ALLOCATED(ADF_MORT)) DEALLOCATE (ADF_MORT)
-
-     !IF(ALLOCATED(SFEED)) DEALLOCATE (SFEED)
-     
-     !Wlong moved this to mod_sf.F
-     !IF(ALLOCATED(SEDTYPE)) DEALLOCATE (SEDTYPE)
-     !
-    
-
+ 
 !====The following are now moved to SAV_DEALLOC() function in wqm_sav.F
      IF(SAV_CALC) THEN
         CALL SAV_DEALLOC
@@ -5485,371 +3696,26 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
         CALL SAV_LOADS_DEALLOC
      ENDIF
      
-     !IF(ALLOCATED(EPATN)) DEALLOCATE (EPATN)     
-     !IF(ALLOCATED(SAVATN)) DEALLOCATE (SAVATN)
-     !IF(ALLOCATED(WATATN)) DEALLOCATE (WATATN)
-     !IF(ALLOCATED(FISH)) DEALLOCATE (FISH)
-     !IF(ALLOCATED(FIEP)) DEALLOCATE (FIEP)
-     !IF(ALLOCATED(NPPSAV)) DEALLOCATE (NPPSAV)
-     !IF(ALLOCATED(NPPEPI)) DEALLOCATE (NPPEPI)
-     
-     !IF(ALLOCATED(LEAF)) DEALLOCATE (LEAF)
-     !IF(ALLOCATED(ROOT)) DEALLOCATE (ROOT)
-     !IF(ALLOCATED(STEM)) DEALLOCATE (STEM)
-     !IF(ALLOCATED(TUBER)) DEALLOCATE (TUBER)
-     !IF(ALLOCATED(EP)) DEALLOCATE (EP)   
-
-     !IF(ALLOCATED(SAVAREA)) DEALLOCATE (SAVAREA)     
-     !IF(ALLOCATED(SAVCELL)) DEALLOCATE (SAVCELL)
-
-     !IF(ALLOCATED(NSAVSPC)) DEALLOCATE (NSAVSPC)     
-!    !IF(ALLOCATED(SAVWDH)) DEALLOCATE (SAVWDH)  !this is now completely deprecated and replaced by SAVFRAC
-     !IF(ALLOCATED(SAVDPH)) DEALLOCATE (SAVDPH)
-     !IF(ALLOCATED(SAVFRAC)) DEALLOCATE (SAVFRAC)     
-
-     !IF(ALLOCATED(PLEAF)) DEALLOCATE (PLEAF)
-     !IF(ALLOCATED(BMLEAF)) DEALLOCATE (BMLEAF)  
-     !IF(ALLOCATED(BMSTEM)) DEALLOCATE (BMSTEM)
-     !IF(ALLOCATED(BMROOT)) DEALLOCATE (BMROOT)
-     !IF(ALLOCATED(BMTUBER)) DEALLOCATE (BMTUBER)
-     
-     !IF(ALLOCATED(PEP)) DEALLOCATE (PEP)
-     !IF(ALLOCATED(BMEP)) DEALLOCATE (BMEP)
-     !IF(ALLOCATED(PREP)) DEALLOCATE (PREP)
-     !IF(ALLOCATED(SLSH)) DEALLOCATE (SLSH)  
-   
-     !IF(ALLOCATED(NLSAV)) DEALLOCATE (NLSAV)
-     !IF(ALLOCATED(PLSAV)) DEALLOCATE (PLSAV)
-     !IF(ALLOCATED(FNSEDSAV)) DEALLOCATE (FNSEDSAV)
-     !IF(ALLOCATED(FPSEDSAV)) DEALLOCATE (FPSEDSAV)
-     !IF(ALLOCATED(NLEPI)) DEALLOCATE (NLEPI)
-     !IF(ALLOCATED(PLEPI)) DEALLOCATE (PLEPI)
-     !IF(ALLOCATED(FHS)) DEALLOCATE (FHS)     
-
-     !IF(ALLOCATED(DOEPIW)) DEALLOCATE (DOEPIW)
-     !IF(ALLOCATED(LDOCEPIW)) DEALLOCATE (LDOCEPIW)
-     !IF(ALLOCATED(RDOCEPIW)) DEALLOCATE (RDOCEPIW)     
-     !IF(ALLOCATED(LPOCEPIW)) DEALLOCATE (LPOCEPIW)
-     !IF(ALLOCATED(RPOCEPIW)) DEALLOCATE (RPOCEPIW)
-     !IF(ALLOCATED(NH4EPIW)) DEALLOCATE (NH4EPIW)
-     !IF(ALLOCATED(NO3EPIW)) DEALLOCATE (NO3EPIW)
-     !IF(ALLOCATED(LDONEPIW)) DEALLOCATE (LDONEPIW)
-     !IF(ALLOCATED(RDONEPIW)) DEALLOCATE (RDONEPIW)
-     !IF(ALLOCATED(LPONEPIW)) DEALLOCATE (LPONEPIW)
-     !IF(ALLOCATED(RPONEPIW)) DEALLOCATE (RPONEPIW)
-     !IF(ALLOCATED(PO4EPIW)) DEALLOCATE (PO4EPIW)
-     !IF(ALLOCATED(LDOPEPIW)) DEALLOCATE (LDOPEPIW)
-     !IF(ALLOCATED(RDOPEPIW)) DEALLOCATE (RDOPEPIW)     
-     !IF(ALLOCATED(LPOPEPIW)) DEALLOCATE (LPOPEPIW)
-     !IF(ALLOCATED(RPOPEPIW)) DEALLOCATE (RPOPEPIW)
-     
-     !IF(ALLOCATED(DOSAVW)) DEALLOCATE (DOSAVW)
-     !IF(ALLOCATED(LDOCSAVW)) DEALLOCATE (LDOCSAVW)
-     !IF(ALLOCATED(RDOCSAVW)) DEALLOCATE (RDOCSAVW)
-     !IF(ALLOCATED(LPOCSAVW)) DEALLOCATE (LPOCSAVW)
-     !IF(ALLOCATED(RPOCSAVW)) DEALLOCATE (RPOCSAVW)
-     !IF(ALLOCATED(NH4SAVW)) DEALLOCATE (NH4SAVW)
-     !IF(ALLOCATED(NO3SAVW)) DEALLOCATE (NO3SAVW)
-     !IF(ALLOCATED(LDONSAVW)) DEALLOCATE (LDONSAVW)
-     !IF(ALLOCATED(RDONSAVW)) DEALLOCATE (RDONSAVW)   
-     !IF(ALLOCATED(LPONSAVW)) DEALLOCATE (LPONSAVW)
-     !IF(ALLOCATED(RPONSAVW)) DEALLOCATE (RPONSAVW)
-     !IF(ALLOCATED(PO4SAVW)) DEALLOCATE (PO4SAVW)
-     !IF(ALLOCATED(LDOPSAVW)) DEALLOCATE (LDOPSAVW)
-     !IF(ALLOCATED(RDOPSAVW)) DEALLOCATE (RDOPSAVW)   
-     !IF(ALLOCATED(LPOPSAVW)) DEALLOCATE (LPOPSAVW)
-     !IF(ALLOCATED(RPOPSAVW)) DEALLOCATE (RPOPSAVW)
-
-   
-     !IF(ALLOCATED(SEDPOCSAV)) DEALLOCATE (SEDPOCSAV)
-     !IF(ALLOCATED(SEDDOSAV)) DEALLOCATE (SEDDOSAV)
-     !IF(ALLOCATED(SEDNH4SAV)) DEALLOCATE (SEDNH4SAV)
-     !IF(ALLOCATED(SEDNO3SAV)) DEALLOCATE (SEDNO3SAV)    
-     !IF(ALLOCATED(SEDPO4SAV)) DEALLOCATE (SEDPO4SAV)
-     !IF(ALLOCATED(SEDPONSAV)) DEALLOCATE (SEDPONSAV)
-     !IF(ALLOCATED(SEDPOPSAV)) DEALLOCATE (SEDPOPSAV)
-
-     !IF(ALLOCATED(DGRDAYS)) DEALLOCATE (DGRDAYS)
-
-!! SAV time averaged quantities
-!     
-     !time average of SAV quantities
-     
-     !IF(ALLOCATED(ALEAF))   DEALLOCATE (ALEAF)
-     !IF(ALLOCATED(AROOT))   DEALLOCATE (AROOT)   
-     !IF(ALLOCATED(AEP))     DEALLOCATE (AEP)
-     !IF(ALLOCATED(ASTEM))   DEALLOCATE (ASTEM)
-     !IF(ALLOCATED(ATUBER))  DEALLOCATE (ATUBER)
-
-     !IF(ALLOCATED(APLEAF))  DEALLOCATE (APLEAF)
-     !IF(ALLOCATED(ABMLEAF)) DEALLOCATE (ABMLEAF)
-     !IF(ALLOCATED(ABMTUBER)) DEALLOCATE (ABMTUBER)
-
-     !IF(ALLOCATED(APEP)) DEALLOCATE (APEP)
-     !IF(ALLOCATED(ABMEP)) DEALLOCATE (ABMEP)     
-     !IF(ALLOCATED(APREP)) DEALLOCATE (APREP)     
-     
-     !IF(ALLOCATED(ASLSH)) DEALLOCATE (ASLSH)
-     
-     !IF(ALLOCATED(ANLSAV))  DEALLOCATE (ANLSAV)
-     !IF(ALLOCATED(APLSAV))  DEALLOCATE (APLSAV)
-     !IF(ALLOCATED(ANLEPI))  DEALLOCATE (ANLEPI)
-     !IF(ALLOCATED(APLEPI))  DEALLOCATE (APLEPI)
-     !IF(ALLOCATED(AFNSED))  DEALLOCATE (AFNSED)
-     !IF(ALLOCATED(AFPSED))  DEALLOCATE (AFPSED)
-     !IF(ALLOCATED(AFHS))    DEALLOCATE (AFHS)
-     
-!     IF(ALLOCATED(AEPATN))  DEALLOCATE (AEPATN)  
-!     IF(ALLOCATED(AWATATN)) DEALLOCATE (AWATATN)
-!     IF(ALLOCATED(AFISH))   DEALLOCATE (AFISH)
-!     IF(ALLOCATED(AFIEP))   DEALLOCATE (AFIEP)   
-!     IF(ALLOCATED(ANPPSAV)) DEALLOCATE (ANPPSAV)
-!     IF(ALLOCATED(ANPPEPI))  DEALLOCATE (ANPPEPI)
-!    
-!     IF(ALLOCATED(ADOSAVW)) DEALLOCATE (ADOSAVW)     
-!     IF(ALLOCATED(ADOCSAVW)) DEALLOCATE (ADOCSAVW)
-!     IF(ALLOCATED(APOCSAVW)) DEALLOCATE (APOCSAVW)
-!     IF(ALLOCATED(ANH4SAVW)) DEALLOCATE (ANH4SAVW)
-!     IF(ALLOCATED(ANO3SAVW)) DEALLOCATE (ANO3SAVW)
-!     IF(ALLOCATED(ADONSAVW)) DEALLOCATE (ADONSAVW)
-!     IF(ALLOCATED(APONSAVW)) DEALLOCATE (APONSAVW)
-!     IF(ALLOCATED(APO4SAVW)) DEALLOCATE (APO4SAVW)
-!     IF(ALLOCATED(ADOPSAVW)) DEALLOCATE (ADOPSAVW)
-!     IF(ALLOCATED(APOPSAVW)) DEALLOCATE (APOPSAVW)   
-
-!     IF(ALLOCATED(ADOEPIW)) DEALLOCATE (ADOEPIW)
-!     IF(ALLOCATED(ADOCEPIW)) DEALLOCATE (ADOCEPIW)   
-!     IF(ALLOCATED(APOCEPIW)) DEALLOCATE (APOCEPIW)     
-!     IF(ALLOCATED(ANH4EPIW)) DEALLOCATE (ANH4EPIW)
-!     IF(ALLOCATED(ANO3EPIW)) DEALLOCATE (ANO3EPIW)
-!     IF(ALLOCATED(ADONEPIW)) DEALLOCATE (ADONEPIW)
-!     IF(ALLOCATED(APONEPIW)) DEALLOCATE (APONEPIW)
-!     IF(ALLOCATED(APO4EPIW)) DEALLOCATE (APO4EPIW)
-!     IF(ALLOCATED(ADOPEPIW)) DEALLOCATE (ADOPEPIW)
-!     IF(ALLOCATED(APOPEPIW)) DEALLOCATE (APOPEPIW)
-
-!     IF(ALLOCATED(ASEDDOSAV))  DEALLOCATE (ASEDDOSAV)
-!     IF(ALLOCATED(ASEDPOCSAV)) DEALLOCATE (ASEDPOCSAV)
-!     IF(ALLOCATED(ASEDPONSAV)) DEALLOCATE (ASEDPONSAV)
-!     IF(ALLOCATED(ASEDPOPSAV)) DEALLOCATE (ASEDPOPSAV)
-!     IF(ALLOCATED(ASEDNH4SAV)) DEALLOCATE (ASEDNH4SAV)   
-!     IF(ALLOCATED(ASEDPO4SAV)) DEALLOCATE (ASEDPO4SAV)
-
-     
 !=========Above are moved to SAV_DEALLOC() in wqm_sav.F ====
      
      IF(SFEEDER)THEN
         CALL SF_DEALLOC
      ENDIF
      
-     !
-     !Deallocating arrays for suspension feeder
-     !
-     
-     !IF(ALLOCATED(SF_JLPOC)) DEALLOCATE (SF_JLPOC)
-     !IF(ALLOCATED(SF_JLPON)) DEALLOCATE (SF_JLPON)
-     !IF(ALLOCATED(SF_JLPOP)) DEALLOCATE (SF_JLPOP)
-     !IF(ALLOCATED(SF_JRPOC)) DEALLOCATE (SF_JRPOC)
-     !IF(ALLOCATED(SF_JRPON)) DEALLOCATE (SF_JRPON)
-     !IF(ALLOCATED(SF_JRPOP)) DEALLOCATE (SF_JRPOP)
-     
-     !IF(ALLOCATED(JNH4SF)) DEALLOCATE (JNH4SF)
-     !IF(ALLOCATED(JPO4SF)) DEALLOCATE (JPO4SF)
-     !IF(ALLOCATED(SODSF)) DEALLOCATE (SODSF)
-     !IF(ALLOCATED(JSASF)) DEALLOCATE (JSASF)
-     !IF(ALLOCATED(JSUSF)) DEALLOCATE (JSUSF)
-     !IF(ALLOCATED(SF_SSI)) DEALLOCATE (SF_SSI)
-     !IF(ALLOCATED(SF_SU)) DEALLOCATE (SF_SU)
-     !IF(ALLOCATED(SF_SA)) DEALLOCATE (SF_SA)
-     !IF(ALLOCATED(SF_PIP)) DEALLOCATE (SF_PIP)
-     
-     !IF(ALLOCATED(SFFILTCT)) DEALLOCATE (SFFILTCT)
-     !IF(ALLOCATED(SFRESPCT)) DEALLOCATE (SFRESPCT)
-     !IF(ALLOCATED(SFPREDCT)) DEALLOCATE (SFPREDCT)
-     !IF(ALLOCATED(SFRATEI)) DEALLOCATE (SFRATEI)
-     !IF(ALLOCATED(SFGCMAX)) DEALLOCATE (SFGCMAX)
-     !IF(ALLOCATED(SFGMIN)) DEALLOCATE (SFGMIN)
-     !IF(ALLOCATED(SFGCING)) DEALLOCATE (SFGCING)
-     !IF(ALLOCATED(SFCFECES)) DEALLOCATE (SFCFECES)
-     !IF(ALLOCATED(SFNFECES)) DEALLOCATE (SFNFECES)
-     !IF(ALLOCATED(SFPFECES)) DEALLOCATE (SFPFECES)
-     !IF(ALLOCATED(SFCPSFEC)) DEALLOCATE (SFCPSFEC)
-     !IF(ALLOCATED(SFNPSFEC)) DEALLOCATE (SFNPSFEC)
-     !IF(ALLOCATED(SFPPSFEC)) DEALLOCATE (SFPPSFEC)
-     
-     !IF(ALLOCATED(SF_SFGC)) DEALLOCATE (SF_SFGC)
-     !IF(ALLOCATED(SF_RESP)) DEALLOCATE (SF_RESP)
-     !IF(ALLOCATED(SF_PRED)) DEALLOCATE (SF_PRED)
-     !IF(ALLOCATED(SF_RMORT)) DEALLOCATE (SF_RMORT)
-     
-     !IF(ALLOCATED(ASF_SFGC)) DEALLOCATE (ASF_SFGC)
-     !IF(ALLOCATED(ASF_RESP)) DEALLOCATE (ASF_RESP)
-     !IF(ALLOCATED(ASF_PRED)) DEALLOCATE (ASF_PRED)
-     !IF(ALLOCATED(ASF_RMORT)) DEALLOCATE (ASF_RMORT)
-     
-!=====the above have been moved to SF_DEALLOC()  in mod_sf.F
-    
-
-
-     !WLong moved this to mod_wqminit.F 
-     !IF(ALLOCATED(C1MIN)) DEALLOCATE (C1MIN)
-     !IF(ALLOCATED(C1MAX)) DEALLOCATE (C1MAX)
-     !IF(ALLOCATED(DOVDAYS)) DEALLOCATE (DOVDAYS)
-     
      CALL WQMINIT_DEALLOC !WLong  replaced the above by WQMINIT_DEALLOC()
      
-      !WLong moved this to HDYRO_GEOM_DEALLOC() in mod_hydrovars.F
-     !IF(ALLOCATED(XG)) DEALLOCATE(XG)
-     !IF(ALLOCATED(YG)) DEALLOCATE(YG)
-     !IF(ALLOCATED(NVG)) DEALLOCATE(NVG)
-     !IF(ALLOCATED(HG)) DEALLOCATE(HG)
-     !IF(ALLOCATED(Z)) DEALLOCATE(Z)
-     !IF(ALLOCATED(ZZ)) DEALLOCATE(ZZ)
-     !IF(ALLOCATED(DZ)) DEALLOCATE(DZ)
-     !IF(ALLOCATED(DZZ)) DEALLOCATE(DZZ)
-     !IF(ALLOCATED(XCG)) DEALLOCATE(XCG)
-     !IF(ALLOCATED(YCG)) DEALLOCATE(YCG)
-     
-     
+
      CALL HYDRO_GEOM_DEALLOC !WLong replaced the above by HYDRO_GEOM_DEALLOC()
-     
 
-     !need move these to mod_obcs.F
-     
-     !moved these to OBCS_DEALLOC()
-     !IF(ALLOCATED(TYPE_OBC_GL)) DEALLOCATE(TYPE_OBC_GL)
-     !IF(ALLOCATED(NUT_OBC_GL)) DEALLOCATE(NUT_OBC_GL)
-     !IF(ALLOCATED(NUT_OBC)) DEALLOCATE(NUT_OBC)
-    
-     !IF(ALLOCATED(OBC_LST)) DEALLOCATE(OBC_LST)
-     
-     !IF(ALLOCATED(NADJN_OBC)) DEALLOCATE(NADJN_OBC)
-     !IF(ALLOCATED(ADJN_OBC)) DEALLOCATE(ADJN_OBC)
-     !IF(ALLOCATED(NEXT_OBC)) DEALLOCATE(NEXT_OBC)
-     !IF(ALLOCATED(NEXT_OBC2)) DEALLOCATE(NEXT_OBC2)
-     !IF(ALLOCATED(NADJC_OBC)) DEALLOCATE(NADJC_OBC)
-     !IF(ALLOCATED(ADJC_OBC)) DEALLOCATE(ADJC_OBC)
-     !IF(ALLOCATED(NXOBC)) DEALLOCATE(NXOBC)
-     !IF(ALLOCATED(NYOBC)) DEALLOCATE(NYOBC)
-     !IF(ALLOCATED(DLTN_OBC)) DEALLOCATE(DLTN_OBC)
-     
        CALL OBCS_DEALLOC
-
-     
-     !IF(ALLOCATED(VX)) DEALLOCATE(VX)                    !1
-     !IF(ALLOCATED(VY)) DEALLOCATE(VY)                    !4
-     !IF(ALLOCATED(XC)) DEALLOCATE(XC)                    !2
-     !IF(ALLOCATED(YC)) DEALLOCATE(YC)                    !3
-
-     !IF(ALLOCATED(H)) DEALLOCATE(H)                    !5
-     !IF(ALLOCATED(H1)) DEALLOCATE(H1)                    !6
-     
-     !IF(ALLOCATED(ART)) DEALLOCATE(ART)                !7
-     !IF(ALLOCATED(ART1)) DEALLOCATE(ART1)                !8
-     !IF(ALLOCATED(ART2)) DEALLOCATE(ART2)                !9
-    
-     !IF (ALLOCATED(UNC1)) DEALLOCATE(UNC1)                !10
-     !IF (ALLOCATED(VNC1)) DEALLOCATE(VNC1)                !11
-     !IF (ALLOCATED(WNC1)) DEALLOCATE(WNC1)                !12
-     !IF (ALLOCATED(WTSNC1)) DEALLOCATE(WTSNC1)            !13
-     !IF (ALLOCATED(UARD_OBCNNC1)) DEALLOCATE(UARD_OBCNNC1)    !14
-     !IF (ALLOCATED(XFLUX_OBCNC1)) DEALLOCATE(XFLUX_OBCNC1)    !15
-     !IF (ALLOCATED(DTFANC1)) DEALLOCATE(DTFANC1)            !16
-     !IF (ALLOCATED(KHNC1)) DEALLOCATE(KHNC1)                !17
-     !IF (ALLOCATED(TNC1)) DEALLOCATE(TNC1)                    !18
-     !IF (ALLOCATED(SNC1)) DEALLOCATE(SNC1)                    !19
-     !IF (ALLOCATED(ELNC1)) DEALLOCATE(ELNC1)                !20
-     
-     !IF (ALLOCATED(UNC2)) DEALLOCATE(UNC2)                    !21
-     !IF (ALLOCATED(VNC2)) DEALLOCATE(VNC2)                    !22
-     !IF (ALLOCATED(WNC2)) DEALLOCATE(WNC2)                    !23
-     !IF (ALLOCATED(WTSNC2)) DEALLOCATE(WTSNC2)                !24
-     !IF (ALLOCATED(UARD_OBCNNC2)) DEALLOCATE(UARD_OBCNNC2)    !25
-     !IF (ALLOCATED(XFLUX_OBCNC2)) DEALLOCATE(XFLUX_OBCNC2)    !26
-     !IF (ALLOCATED(DTFANC2)) DEALLOCATE(DTFANC2)            !27
-     !IF (ALLOCATED(KHNC2)) DEALLOCATE(KHNC2)                !28
-     !IF (ALLOCATED(TNC2)) DEALLOCATE(TNC2)                    !29
-     !IF (ALLOCATED(SNC2)) DEALLOCATE(SNC2)                    !30
-     !IF (ALLOCATED(ELNC2)) DEALLOCATE(ELNC2)                !31
-     
-     !IF (ALLOCATED(UU)) DEALLOCATE(UU)                        !32
-     !IF (ALLOCATED(VV)) DEALLOCATE(VV)                        !33
-     !     
-     !IF (ALLOCATED(UUT)) DEALLOCATE(UUT)                    !34
-     !IF (ALLOCATED(VVT)) DEALLOCATE(VVT)                    !35
-     !IF (ALLOCATED(WTST)) DEALLOCATE(WTST)                    !36
-     !IF (ALLOCATED(UARD_OBCNT)) DEALLOCATE(UARD_OBCNT)        !37
-     !IF (ALLOCATED(XFLUX_OBCT)) DEALLOCATE(XFLUX_OBCT)        !38
-     !IF (ALLOCATED(DTFAT)) DEALLOCATE(DTFAT)                !39
-
-     !IF (ALLOCATED(WTS)) DEALLOCATE(WTS)                    !40
-     !IF (ALLOCATED(UARD_OBCN)) DEALLOCATE(UARD_OBCN)        !41
-     !IF (ALLOCATED(XFLUX_OBC)) DEALLOCATE(XFLUX_OBC)        !42
-
-     !IF (ALLOCATED(KH)) DEALLOCATE(KH)                        !43
-     !IF (ALLOCATED(EL)) DEALLOCATE(EL)                        !44
-     !IF (ALLOCATED(ET)) DEALLOCATE(ET)                        !45
-     !IF (ALLOCATED(D)) DEALLOCATE(D)                        !46
-     !IF (ALLOCATED(DT)) DEALLOCATE(DT)                        !47
-     !IF (ALLOCATED(DT1)) DEALLOCATE(DT1)                    !48
-     !IF (ALLOCATED(DTFA)) DEALLOCATE(DTFA)                    !49
-     !IF (ALLOCATED(VISCOFH)) DEALLOCATE(VISCOFH)            !50
-     
+  
     !WLong moved the above to HYDRO_DEALLOC() in mod_hydrovars.F
      CALL HYDRO_DEALLOC
      
-     
-     
-     !IF(ALLOCATED(ICELLQ)) DEALLOCATE(ICELLQ)     
-     !IF(ALLOCATED(INODEQ)) DEALLOCATE(INODEQ)
-     !IF(ALLOCATED(DWDIS)) DEALLOCATE(DWDIS)
-     !IF(ALLOCATED(QBC_TM%TIMES)) DEALLOCATE(QBC_TM%TIMES)
-     !IF(ALLOCATED(PNT_TM%TIMES)) DEALLOCATE(PNT_TM%TIMES)
-     
-     !WLong move the above to BCS_DEALLOC in mod_bcs.F
+    !WLong move the above to BCS_DEALLOC in mod_bcs.F
      CALL BCS_DEALLOC
-     
-     !IF(ALLOCATED(I_OBC_N)) DEALLOCATE(I_OBC_N)
-     !IF(ALLOCATED(I_OBC_GL)) DEALLOCATE(I_OBC_GL)
      !WLong moved the above to BCMAP_DEALLOC() in mod_bcmap.F
      CALL BCMAP_DEALLOC
-     
-    
-     !IF (ALLOCATED(ISBCE)) DEALLOCATE(ISBCE)
-     !IF (ALLOCATED(ISONB)) DEALLOCATE(ISONB)
-     !IF (ALLOCATED(NBE)) DEALLOCATE(NBE) 
-     !IF (ALLOCATED(NTVE)) DEALLOCATE(NTVE)
-     !IF (ALLOCATED(NTSN)) DEALLOCATE(NTSN)
-     !IF (ALLOCATED(NV)) DEALLOCATE(NV)
-     
-     !IF (ALLOCATED(IEC)) DEALLOCATE(IEC)
-     !IF (ALLOCATED(IENODE)) DEALLOCATE(IENODE)
-     !IF (ALLOCATED(XIJC)) DEALLOCATE(XIJC)
-     !IF (ALLOCATED(YIJC)) DEALLOCATE(YIJC)
-     !IF (ALLOCATED(DLTXC)) DEALLOCATE(DLTXC)
-     !IF (ALLOCATED(DLTYC)) DEALLOCATE(DLTYC)
-     !IF (ALLOCATED(DLTXYC)) DEALLOCATE(DLTXYC)     
-     !IF (ALLOCATED(SITAC)) DEALLOCATE(SITAC)
-
-     !IF (ALLOCATED(ISBC)) DEALLOCATE(ISBC)
-     
-     !IF (ALLOCATED(NBVE)) DEALLOCATE(NBVE)
-     !IF (ALLOCATED(NBVT)) DEALLOCATE(NBVT)     
-     !IF (ALLOCATED(NBSN)) DEALLOCATE(NBSN)
-     !IF (ALLOCATED(NIEC)) DEALLOCATE(NIEC)
-     !IF (ALLOCATED(NTRG)) DEALLOCATE(NTRG)
-
-     !IF (ALLOCATED(XIJE)) DEALLOCATE(XIJE)
-     !IF (ALLOCATED(YIJE)) DEALLOCATE(YIJE)
-     !IF (ALLOCATED(DLTXE)) DEALLOCATE(DLTXE)
-     !IF (ALLOCATED(DLTYE)) DEALLOCATE(DLTYE)
-     !IF (ALLOCATED(DLTXYE)) DEALLOCATE(DLTXYE)
-     !IF (ALLOCATED(SITAE)) DEALLOCATE(SITAE)
-     !IF (ALLOCATED(EPOR)) DEALLOCATE(EPOR)     
-
-     !IF (ALLOCATED(LISBCE_1)) DEALLOCATE(LISBCE_1)
-     !IF (ALLOCATED(LISBCE_2)) DEALLOCATE(LISBCE_2)
-     !IF (ALLOCATED(LISBCE_3)) DEALLOCATE(LISBCE_3)
      
      CALL TGE_DEALLOC !replaced the above by TGE_DEALLOC
           
@@ -5859,7 +3725,6 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 
 #if defined (MULTIPROCESSOR)
      if(PAR) THEN
-     
      
         DO I = 1, NPROCS
             IF(ALLOCATED(EMAP(I)%LOC_2_GL)) DEALLOCATE(EMAP(I)%LOC_2_GL)
@@ -5875,59 +3740,11 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
         
      ENDIF
      
-     !need to move these to mod_bcmap.F
-     !Moved this to PAR_DEALLOC()
-     !IF(ALLOCATED(NMAP)) DEALLOCATE (NMAP)
-     !IF(ALLOCATED(EMAP)) DEALLOCATE (EMAP)
-     !!IF(ALLOCATED(RIV_GL2LOC)) DEALLOCATE(RIV_GL2LOC) !WLong moved above to BCS_DEALLOC
-     !IF(ALLOCATED(EC)) DEALLOCATE(EC)
-     !IF(ALLOCATED(BNC)) DEALLOCATE(BNC)
-     !IF(ALLOCATED(NC)) DEALLOCATE(NC)
-     !IF(ALLOCATED(PNHN)) DEALLOCATE(PNHN)
-     !IF(ALLOCATED(EGID)) DEALLOCATE(EGID)
-     !IF(ALLOCATED(NGID)) DEALLOCATE(NGID)
-     !IF(ALLOCATED(HE_LST)) DEALLOCATE(HE_LST)
-     !IF(ALLOCATED(ELID)) DEALLOCATE(ELID)
-     !IF(ALLOCATED(ELID_X)) DEALLOCATE(ELID_X)
-     !IF(ALLOCATED(NDE_ID)) DEALLOCATE(NDE_ID)
-     !IF(ALLOCATED(BN_LST)) DEALLOCATE(BN_LST)
-     !IF(ALLOCATED(BN_MLT)) DEALLOCATE(BN_MLT)
-     !IF(ALLOCATED(BN_LOC)) DEALLOCATE(BN_LOC)
-     !IF(ALLOCATED(BN_NEY)) DEALLOCATE(BN_NEY)
-     !IF(ALLOCATED(HN_LST)) DEALLOCATE(HN_LST)
-     !IF(ALLOCATED(HN_OWN)) DEALLOCATE(HN_OWN)
-     !IF(ALLOCATED(NLID)) DEALLOCATE(NLID)
-     !IF(ALLOCATED(NLID_X)) DEALLOCATE(NLID_X)
-     !IF(ALLOCATED(PNE)) DEALLOCATE(PNE)
-     !IF(ALLOCATED(PNN)) DEALLOCATE(PNN)
-     !IF(ALLOCATED(PNHE)) DEALLOCATE(PNHE)
-     !IF(ALLOCATED(PNBN)) DEALLOCATE(PNBN)
-     !IF(ALLOCATED(PMBM)) DEALLOCATE(PMBM)
-     
      CALL PAR_DEALLOC
 #endif
      
-    IF(SEDIMENT_CALC)THEN
-    
-        !moved these to SED_DEALLOC in mod_sed.F
-       !IF(ALLOCATED(CTEMP_GL))      DEALLOCATE(CTEMP_GL)
-       !IF(ALLOCATED(CPOP_GL))       DEALLOCATE(CPOP_GL)
-       !IF(ALLOCATED(CPON_GL))       DEALLOCATE(CPON_GL)
-       !IF(ALLOCATED(CPOC_GL))       DEALLOCATE(CPOC_GL)
-       !IF(ALLOCATED(CPOS_GL))       DEALLOCATE(CPOS_GL)
-       !IF(ALLOCATED(PO4T2TM1S_GL))  DEALLOCATE(PO4T2TM1S_GL)
-       !IF(ALLOCATED(NH4T2TM1S_GL))  DEALLOCATE(NH4T2TM1S_GL)
-       !IF(ALLOCATED(NO3T2TM1S_GL))  DEALLOCATE(NO3T2TM1S_GL)
-       !IF(ALLOCATED(HST2TM1S_GL))   DEALLOCATE(HST2TM1S_GL)
-       !IF(ALLOCATED(CH4T2TM1S_GL))  DEALLOCATE(CH4T2TM1S_GL)
-       !IF(ALLOCATED(CH41TM1S_GL))   DEALLOCATE(CH41TM1S_GL)
-       !IF(ALLOCATED(SO4T2TM1S_GL))  DEALLOCATE(SO4T2TM1S_GL)
-       !IF(ALLOCATED(SIT2TM1S_GL))   DEALLOCATE(SIT2TM1S_GL)
-       !IF(ALLOCATED(BENSTRTM1S_GL))   DEALLOCATE(BENSTRTM1S_GL)
-    
-       !moved this to BA_DEALLOC()
-       !IF(ALLOCATED(BBM_GL))        DEALLOCATE(BBM_GL)
-       
+    IF(SEDIMENT_CALC)THEN 
+
        !Wen Long deallocating sediment diagenesis related variables 
         CALL SED_DEALLOC
     
@@ -5957,7 +3774,6 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
     
     CALL WC_DOM_DEALLOCATE
 	
-
 !Wen Long, report model time 
     IF(MSR)THEN
         TOTAL_TIME=TOTAL_TIME+DTIME(ELAPSED)    !CALL DTIME() and return user time in ELAPSED(1), system time in ELAPSED(2)
@@ -5968,8 +3784,8 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
         WRITE(*,'(A22,EN15.3,A8)')"Total time used      =",TOTAL_TIME," seconds"
     ENDIF
 
-   
-   CALL PSTOP     !Wen Long and Laura found this does not stop the run properly
+   !CALL MPI_FINALIZE(IERR)
+   STOP     !Wen Long and Laura found this does not stop the run properly
    
 
    END PROGRAM PARWQM
@@ -6823,11 +4639,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 				ALGDOC_OUT ,   & ! Algae DOC production
 				
 				ALGDOC_GL,    & ! Global Algae DOC production,
-				
-				ALGPredDOC, &
-				ALGPredDOC_GL, &
-				ALGPPDOC,  &
-				ALGPPDOC_GL, &
+
 			
 				
 				ALGPOC_OUT,    & !Algae POC production from predation
@@ -6837,7 +4649,13 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 				HDRLPOC_GL,  &! 
 				
 				HDRRPOC_OUT,  & ! Hydrolysis of RPOC to DOC
-				HDRRPOC_GL
+				HDRRPOC_GL, &!
+				DTLPOC_out, &!
+				DTRPOC_out, &!
+				DTRPON_out, &!
+				DTLPON_out, &!
+				DTNH4_out, &!
+				DTNO3_out
 				
 				
 
@@ -6852,7 +4670,12 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 					  DTWCDON1_GL,DTWCDON2_GL,DTWCDON3_GL,  &
 					  DTWNCDON1_GL,DTWNCDON2_GL,DTWNCDON3_GL, &
 					  DTNH4_GL,DTNO3_GL,DTLPON_GL,DTLPOC_GL,DTRPON_GL,DTRPOC_GL, &
-					  PHOTOCHEM_DOC_ACCUM_OUT
+					  PHOTOCHEM_DOC_ACCUM_OUT, &
+					  	DTWCDOC1_out,DTWNCDOC1_out,DTWCDOC2_out,DTWNCDOC2_out,   &
+						DTWCDOC3_out,DTWNCDOC3_out,   & 
+						DTWCDON1_out,DTWNCDON1_out,DTWCDON2_out,DTWNCDON2_out,   &
+						DTWCDON3_out,DTWNCDON3_out,   & 
+						DTWCDOP1_out,DTWNCDOP1_out,DTWCDOP2_out,DTWNCDOP2_out
 					  
     USE MOD_OWQ, ONLY:                  & 
                         !INITKE,        &!
@@ -7817,6 +5640,10 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
         
        JPOC,         &!
       JPON,         &!
+	  
+	  JPOC_out, &!
+	  JPON_out, &!
+	  JNH4_out, JNO3_out, &
       JPOP,         &!                
       JPOS,         &!
 !        CCH4,           &!
@@ -8473,7 +6300,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 
 	   
 	   ! B Clark add in photochemical fluxes if we are using the module
-#if defined(PHOTODEGRADATION)		   
+#if defined(PHOTODEGRADATION) && defined(BUDGET)	
 	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,1),          PHOTOCHEM_DOC_ACCUM_GL(1,1,1))
 	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,2),          PHOTOCHEM_DOC_ACCUM_GL(1,1,2))
 	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,3),          PHOTOCHEM_DOC_ACCUM_GL(1,1,3))
@@ -8491,12 +6318,33 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,15),          PHOTOCHEM_DOC_ACCUM_GL(1,1,15))
 	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,16),          PHOTOCHEM_DOC_ACCUM_GL(1,1,16))
 	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,17),          PHOTOCHEM_DOC_ACCUM_GL(1,1,17))
-	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,18),          PHOTOCHEM_DOC_ACCUM_GL(1,1,18))																													  
-
-#endif	   
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM_OUT(1,1,18),          PHOTOCHEM_DOC_ACCUM_GL(1,1,18))		
+#elif defined(PHOTODEGRADATION)
+	   !This has the instantanous flux output
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,1),          PHOTOCHEM_DOC_ACCUM_GL(1,1,1))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,2),          PHOTOCHEM_DOC_ACCUM_GL(1,1,2))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,3),          PHOTOCHEM_DOC_ACCUM_GL(1,1,3))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,4),          PHOTOCHEM_DOC_ACCUM_GL(1,1,4))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,5),          PHOTOCHEM_DOC_ACCUM_GL(1,1,5))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,6),          PHOTOCHEM_DOC_ACCUM_GL(1,1,6))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,7),          PHOTOCHEM_DOC_ACCUM_GL(1,1,7))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,8),          PHOTOCHEM_DOC_ACCUM_GL(1,1,8))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,9),          PHOTOCHEM_DOC_ACCUM_GL(1,1,9))																													  
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,10),          PHOTOCHEM_DOC_ACCUM_GL(1,1,10))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,11),          PHOTOCHEM_DOC_ACCUM_GL(1,1,11))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,12),          PHOTOCHEM_DOC_ACCUM_GL(1,1,12))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,13),          PHOTOCHEM_DOC_ACCUM_GL(1,1,13))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,14),          PHOTOCHEM_DOC_ACCUM_GL(1,1,14))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,15),          PHOTOCHEM_DOC_ACCUM_GL(1,1,15))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,16),          PHOTOCHEM_DOC_ACCUM_GL(1,1,16))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,17),          PHOTOCHEM_DOC_ACCUM_GL(1,1,17))
+	   CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,PHOTOCHEM_DOC_ACCUM(1,1,18),          PHOTOCHEM_DOC_ACCUM_GL(1,1,18))																													  
+#endif
+	   
 																													  
 ! B CLark added below for budget terms, July 2018
-		!!! Nitrogen																								  
+		!!! Nitrogen	
+#if defined (BUDGET)	   
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGDON_OUT(1,1), ALGDON_GL(1,1))																											  
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGPON_OUT(1,1), ALGPON_GL(1,1))	
 			
@@ -8528,36 +6376,59 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGDOC_OUT(1,1), ALGDOC_GL(1,1))																											  
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGPOC_OUT(1,1), ALGPOC_GL(1,1))	
 			
-			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGPPDOC(1,1), ALGPPDOC_GL(1,1))	
-			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGPredDOC(1,1), ALGPredDOC_GL(1,1))	
+			!CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGPPDOC(1,1), ALGPPDOC_GL(1,1))	
+			!CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,ALGPredDOC(1,1), ALGPredDOC_GL(1,1))	
 			
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DENIT_OUT(1,1), DENIT_GL(1,1))
 			
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,HDRLPOC_OUT(1,1), HDRLPOC_GL(1,1))																				  
 			CALL GATHER(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,HDRRPOC_OUT(1,1), HDRRPOC_GL(1,1))	
 																						
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,9 ),DTWCDOC1_GL(1,1)) ! CDOC1
-        !call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,10 ),DTWCDOC2_GL(1,1)) !NCDOC1
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,33),DTWCDOC3_GL(1,1)) ! CDOC2
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,34),DTWNCDOC1_GL(1,1)) !NCDOC2
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,35),DTWNCDOC2_GL(1,1)) !CDOC3
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,36),DTWNCDOC3_GL(1,1)) !NCDOC3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDOC1_out(1,1),DTWCDOC1_GL(1,1)) ! CDOC1
+        call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDOC2_out(1,1),DTWCDOC2_GL(1,1)) !NCDOC1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDOC3_out(1,1),DTWCDOC3_GL(1,1)) ! CDOC2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDOC1_out(1,1),DTWNCDOC1_GL(1,1)) !NCDOC2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDOC2_out(1,1),DTWNCDOC2_GL(1,1)) !CDOC3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDOC3_out(1,1),DTWNCDOC3_GL(1,1)) !NCDOC3
 		
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,16),DTWCDON1_GL(1,1))!CDON1
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,17),DTWCDON2_GL(1,1)) !NCDON1
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,37),DTWCDON3_GL(1,1))!CDON2
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,38),DTWNCDON1_GL(1,1)) !NCDON2
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,39),DTWNCDON2_GL(1,1)) !CDON3
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,40),DTWNCDON3_GL(1,1))!NCDON3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDON1_out(1,1),DTWCDON1_GL(1,1))!CDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDON2_out(1,1),DTWCDON2_GL(1,1)) !NCDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDON3_out(1,1),DTWCDON3_GL(1,1))!CDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDON1_out(1,1),DTWNCDON1_GL(1,1)) !NCDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDON2_out(1,1),DTWNCDON2_GL(1,1)) !CDON3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDON3_out(1,1),DTWNCDON3_GL(1,1))!NCDON3
 		!																			
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,13),DTNH4_GL(1,1))!CDON1
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,14),DTNO3_GL(1,1)) !NCDON1
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,11),DTLPOC_GL(1,1))!CDON2
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,12),DTRPOC_GL(1,1)) !NCDON2
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,18),DTLPON_GL(1,1)) !CDON3
-		!call gather(0,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTC(0,1,19),DTRPON_GL(1,1))!NCDON3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTNH4_out,DTNH4_GL(1,1))!CDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTNO3_out,DTNO3_GL(1,1)) !NCDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTLPOC_out,DTLPOC_GL(1,1))!CDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTRPOC_out,DTRPOC_GL(1,1)) !NCDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTLPON_out,DTLPON_GL(1,1)) !CDON3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTLPON_out,DTRPON_GL(1,1))!NCDON3
 		!																				
-																						
+#else
+	    call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDOC1(1,1),DTWCDOC1_GL(1,1)) ! CDOC1
+        call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDOC2(1,1),DTWCDOC2_GL(1,1)) !NCDOC1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDOC3(1,1),DTWCDOC3_GL(1,1)) ! CDOC2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDOC1(1,1),DTWNCDOC1_GL(1,1)) !NCDOC2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDOC2(1,1),DTWNCDOC2_GL(1,1)) !CDOC3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDOC3(1,1),DTWNCDOC3_GL(1,1)) !NCDOC3
+		
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDON1(1,1),DTWCDON1_GL(1,1))!CDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDON2(1,1),DTWCDON2_GL(1,1)) !NCDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWCDON3(1,1),DTWCDON3_GL(1,1))!CDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDON1(1,1),DTWNCDON1_GL(1,1)) !NCDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDON2(1,1),DTWNCDON2_GL(1,1)) !CDON3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTWNCDON3(1,1),DTWNCDON3_GL(1,1))!NCDON3
+		!																			
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTNH4,DTNH4_GL(1,1))!CDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTNO3,DTNO3_GL(1,1)) !NCDON1
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTLPOC,DTLPOC_GL(1,1))!CDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTRPOC,DTRPOC_GL(1,1)) !NCDON2
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTLPON,DTLPON_GL(1,1)) !CDON3
+		call gather(1,MTLOC,MLOC,MGL,KBM1,MYID,NPROCS,NMAP,DTLPON,DTRPON_GL(1,1))!NCDON3	
+		
+#endif
+		
 !WLong: Note above, C2 and C2_GL all have first indices starting from zero
 !    I wonder why would we pass C2(0,,) to C2_GL(1,,) instead of C2_GL(0,*,*) 
 !    but SALT starts from 0, and S_GL starts from 1
@@ -8584,12 +6455,21 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
             !(JPON_GL(MGL,3));
             !(JPOP_GL(MGL,3));
             !(JPOS_GL(MGL));    
-       
+#if defined(BUDGET)
+	        CALL GATHER(1,MTLOC,MLOC,MGL,3,MYID,NPROCS,NMAP,JPOC_out(1,1)  ,    JPOC_GL(1,1))
+            CALL GATHER(1,MTLOC,MLOC,MGL,3,MYID,NPROCS,NMAP,JPON_out(1,1)  ,    JPON_GL(1,1))   
+			CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JNH4_out(1)  ,        JNH4_GL(1))               
+            CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JNO3_out(1)  ,        JNO3_GL(1))   
+	   
+#else
             CALL GATHER(1,MTLOC,MLOC,MGL,3,MYID,NPROCS,NMAP,JPOC(1,1)  ,    JPOC_GL(1,1))
             CALL GATHER(1,MTLOC,MLOC,MGL,3,MYID,NPROCS,NMAP,JPON(1,1)  ,    JPON_GL(1,1))
             CALL GATHER(1,MTLOC,MLOC,MGL,3,MYID,NPROCS,NMAP,JPOP(1,1)  ,    JPOP_GL(1,1))
             CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JPOS(1)  ,        JPOS_GL(1))
-       
+			CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JNH4TM1S(1)  ,        JNH4_GL(1))
+            !(JNO3_GL(MGL));                
+            CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JNO3TM1S(1)  ,        JNO3_GL(1))   
+#endif       
             !!(O20_GL(MGL));            !given by C2_GL(:,:,27)
             !!(D_GL(MGL));                !already defined
             !(CTEMP_GL(MGL));             !
@@ -8602,10 +6482,7 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
             !(SODTM1S_GL(MGL));      
             CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,SODTM1S(1)  ,        SODTM1S_GL(1))
             !!(SOD_GL(MGL));            !given by SODTM1S_GL
-            !(JNH4_GL(MGL));                
-            CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JNH4TM1S(1)  ,        JNH4_GL(1))
-            !(JNO3_GL(MGL));                
-            CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,JNO3TM1S(1)  ,        JNO3_GL(1))        
+            !(JNH4_GL(MGL));                     
             !(BENDEN_GL(MGL));        
             CALL GATHER(1,MTLOC,MLOC,MGL,1,MYID,NPROCS,NMAP,BENDEN(1)  ,        BENDEN_GL(1))        
             !(JCH4_GL(MGL));                
@@ -8759,15 +6636,12 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
 # if defined(SEDIMENT_DOM)
 
                 IF(SED_DOM) THEN
-
                     JNH4_GL_SHARE = JNH4_GL!NH4 flux in sediments (mg N / m^2/day)
                     JNO3_GL_SHARE = JNO3_GL!NO3 flux in sediments (mg N / m^2/day)
                     NO31_GL_SHARE = NO31_GL   !sediment layer 1 NO3 conc
                     NO32_GL_SHARE = NO32_GL      !sediment layer 2 NO3 conc
                     NH41_GL_SHARE = NH41_GL      !sediment layer 1 NH4 conc
-                    NH42_GL_SHARE = NH42_GL
-					
-					
+                    NH42_GL_SHARE = NH42_GL	
 					CALL SED_DOM_OUTPUT
 
                 ENDIF
@@ -8982,148 +6856,125 @@ USE MOD_NCDIO, ONLY : CDF_OUT, &
                                      (H_GL(I),I=1,MGL),            &  !Wen Long output still water depth                    1
                                      (EL_GL(I),I=1,MGL),           &  !Wen Long output surface elevation					2
                                      (D_GL(I),I=1,MGL),            &  !Wen Long output total depth							3	
-                                     (-D_GL(I)*ZZ(K),I=1,MGL),     &  !Wen Long,depth of this layer (from surface)			4
-                                     (C2_GL(I,K,27),I=1,MGL),      &  !DOXG													5
-									
-									 (total_netPP_GL(I),I=1,MGL),   &   ! net primary production (g chl						6
-                                     
-                                     (C2_GL(I,K,4),I=1,MGL),       &  !ALG1													7
-                                     (C2_GL(I,K,5),I=1,MGL),       &  !ALG2													8
-                                     (C2_GL(I,K,13),I=1,MGL),      &  !NH4													9
-                                     (C2_GL(I,K,14),I=1,MGL),      &  !NO3													10
-                                     (C2_GL(I,K,20),I=1,MGL),      &  !PO4													11
-!                                    (total_netPP_GL(I),I=1,MGL),  &!
-                                     (T_GL(I,K),I=1,MGL),          &  !Temperature											12
-                                     (S_GL(I,K),I=1,MGL),          &  !Salinity												13
-                                     (IAVG_GL(I,K),I=1,MGL),       &  !PAR (E/m^2/day)										14
-                                     
-                                     (C2_GL(I,K,11),I=1,MGL),      &  !LPOC													15
-                                     (C2_GL(I,K,12),I=1,MGL),      &    !RPOC												16
-									 
-									 (C2_GL(I,K,9),I=1,MGL),       &  !CDOC1												17
-									 (C2_GL(I,K,10),I=1,MGL),      &  !NCDOC1												18
-									 (C2_GL(I,K,33),I=1,MGL),       &  !CDOC2												19
-									 (C2_GL(I,K,34),I=1,MGL),      &  !NCDOC2												20
-									 (C2_GL(I,K,35),I=1,MGL),       &  !CDOC3												21
-									 (C2_GL(I,K,36),I=1,MGL),      &  !NCDOC3												22
-								
-									 (C2_GL(I,K,16),I=1,MGL),       &  !CDON1												23
-									 (C2_GL(I,K,17),I=1,MGL),      &  !NCDON1												24
-									 (C2_GL(I,K,37),I=1,MGL),       &  !CDON2												25
-									 (C2_GL(I,K,38),I=1,MGL),      &  !NCDON2												26
-									 (C2_GL(I,K,39),I=1,MGL),       &  !CDON3												27
-									 (C2_GL(I,K,40),I=1,MGL),      &  !NCDON3												28
-									
-									 !(C2_GL(I,K,21),I=1,MGL),       &  !CDOP1
-									 !(C2_GL(I,K,22),I=1,MGL),      &  !NCDOP1
-									 !(C2_GL(I,K,41),I=1,MGL),       &  !CDOP2
-									 !(C2_GL(I,K,42),I=1,MGL),      &  !NCDOP2
-									 !(C2_GL(I,K,43),I=1,MGL),       &  !CDOP3
-									 !(C2_GL(I,K,44),I=1,MGL),        &  !NCDOP3	
-									 
-						(KDLAMB_int_GL(I,K),I=1,MGL), & !   ! Added B Clark May 2018, Attenuation coefficient				29
-						(SSI_GL(I,K),I=1,MGL),  & ! Added by B Clark June 2018 to output SSI								30
-						(RHO1_GL(I,K),I=1,MGL) , & !			Density															31
-						(ShearStress_GL(I),I=1,MGL),  &  															!		32
-
+                                     (-D_GL(I)*ZZ(K),I=1,MGL),     &  !Wen Long,depth of this layer (from surface)			4									 
+! B Clark deleted state variable output above, now all state variables can be output in netcdf format
+!!Below are the volume and time integrated budget terms, these are the only values output, preferably at t0 and tfinal
+!use netcdf for state variable time series, these will be for the budget
+! Changed Feb, 2019									 
 	!=============== Sediment water column Flux ============================
-                        (JNH4_GL(I),I=1,MGL),      & !mg N/m^2/day   !														33
+                        (JNH4_GL(I),I=1,MGL),          &   !														5
+                        (JNO3_GL(I),I=1,MGL),          &					!										6										
 						
-                        (JNO3_GL(I),I=1,MGL),    &					!														34										
+						(JPOC_GL(I,1),I=1,MGL),        &      !'Jcin1'                 								7		      
+						(JPOC_GL(I,2), I=1,MGL),       &      !'Jcin2'                  							8		      
+						(JPOC_GL(I,3),I=1,MGL),        &      !'Jcin3'               							    9
 						
-						((JPOC_GL(I,1)+   &      !'Jcin1'               mgC/m^2/d    										      
-							JPOC_GL(I,2)+   &      !'Jcin2'               mgC/m^2/d      									      
-							JPOC_GL(I,3)),I=1,MGL),   &      !'Jcin3'               mgC/m^2/d   							35
-						
-							((JPON_GL(I,1) +        &      !'Jnin1'               *mgN/m^2/d          
-							JPON_GL(I,2)+        &      !'Jnin2'               *mgN/m^2/d            
-							JPON_GL(I,3)),I=1,MGL),        &      !'Jnin3'               *mgN/m^2/d  						36
+					    (JPON_GL(I,1),I=1,MGL),        &      !'Jnin1'                      						10
+						(JPON_GL(I,2),I=1,MGL),        &      !'Jnin2'                       						11
+						(JPON_GL(I,3),I=1,MGL),        &      !'Jnin3'             									12
 							
-						 ((JDOM_OUT_GL(I,1)  +      &      !' g C m^-2 d^-1      JDOC1  
-					    	JDOM_OUT_GL(I,4)),I=1,MGL),        &  !															37	
+						(JDOM_OUT_GL(I,1),I=1,MGL),    &      ! JCDOC1  											13
+					    (JDOM_OUT_GL(I,4),I=1,MGL),    &  !	JNCDOC1													14	
 						 
-						 ((JDOM_OUT_GL(I,2)  +      &      !' g C m^-2 d^-1      JDOC2  
-					    	JDOM_OUT_GL(I,5)),I=1,MGL),        & ! 															38
+						(JDOM_OUT_GL(I,2),I=1,MGL),    & !    JCDOC2  												15
+					    (JDOM_OUT_GL(I,5),I=1,MGL),    & ! JNCDOC2													16
 						 
-						 ((JDOM_OUT_GL(I,3)  +      &      !' g C m^-2 d^-1      JDOC2  		
-					    	JDOM_OUT_GL(I,6)),I=1,MGL),        & ! 															39
+						(JDOM_OUT_GL(I,3) ,I=1,MGL),   &  !    JCDOC3  												17
+					    (JDOM_OUT_GL(I,6),I=1,MGL),    & ! 	JNCDOC3													18
 
-						 ((JDOM_OUT_GL(I,7)  +      &      !' g C m^-2 d^-1      JDON1  	
-					    	JDOM_OUT_GL(I,10)),I=1,MGL),        &  !														40
+						(JDOM_OUT_GL(I,7),I=1,MGL),    &   !    JCDON1  											19
+					    (JDOM_OUT_GL(I,10),I=1,MGL),   &  !	JNCDON1													20
 						 
-						 ((JDOM_OUT_GL(I,8)  +      &      !' g C m^-2 d^-1      JDON2  
-					    	JDOM_OUT_GL(I,11)),I=1,MGL),        & ! 														41
-						 
-						 ((JDOM_OUT_GL(I,9)  +      &      !' g C m^-2 d^-1      JDON3  
-					    	JDOM_OUT_GL(I,12)),I=1,MGL),        & ! 														42
+						(JDOM_OUT_GL(I,8) ,I=1,MGL),   & !      JCDON2  											21	
+					    (JDOM_OUT_GL(I,11),I=1,MGL),   & ! 	JNCDON2													22
+						
+						(JDOM_OUT_GL(I,9),I=1,MGL),    &!      JCDON3  												23
+					    (JDOM_OUT_GL(I,12),I=1,MGL),   & ! 	JNCDON3													24
 						 
 ! ==================== Water column changes ============================
 				!!!!! NITROGEN		 
-						  (ALGDON_GL(I,K),I=1,MGL),   &   ! Algae DON production (exudation and predation) g N m^-3 d^-1	43
-						  (ALGPON_GL(I,K),I=1,MGL),   &   ! Algae PON production (exudation and predation) g N m^-3 d^-1	44
-						  (ALGNH4_GL(I,K),I=1,MGL),   &   ! Algae NH4 balance (uptake/excretion/predation) g N m^-3 d^-1    45
-						  (ALGNO3_GL(I,K),I=1,MGL),   &   ! Algae NO3 Uptake g N m^-3 d^-1    								46
-						  (DENNO3_GL(I,K),I=1,MGL),   &   ! Denitrification loss of NO3, g N m^-3 d^-1						47
-						  (NT_GL(I,K),I=1,MGL),     & ! Loss of Nh4 due to nitrification, production of NO3 g N m^-3 d^-1   48
-						  (DENITN_GL(I,K),I=1,MGL),  & !remin of DON due to denitrification g N m^-3 d^-1 (makes NH4)       49
-						  (HDRLPON_GL(I,K),I=1,MGL), & ! hydrolytic loss of LPON to DON  g N m^-3 d^-1                      50
-						  (HDRRPON_GL(I,K),I=1,MGL), & ! hydrolytic loss of RPON to DON  g N m^-3 d^-1                      51
-						  (COAGN_GL(I,K),I=1,MGL),  & ! coagulation of DON3 to RPON g N m^-3 d^-1							52
-						  (MNLDON1_GL(I,K),I=1,MGL), & ! remin of DON 1 g N m^-3 d^-1										53
-						  (MNLDON2_GL(I,K),I=1,MGL), & ! remin of DON 2 g N m^-3 d^-1										54				
-						  (MNLDON3_GL(I,K),I=1,MGL), & ! remin of DON 3 g N m^-3 d^-1										55
-						  (C2_GL(I,K,18),I=1,MGL),   & ! LPON g N N m^-3 d^-1 												56
-						  (C2_GL(I,K,19),I=1,MGL),   & ! LPON g N N m^-3 d^-1 												57
-						  ((DTWCDON1_GL(I,K)+DTWCDON2_GL(I,K)+DTWCDON3_GL(I,K) &	! change in DON over time, g N m^-3 d^-1											!			58
-						  + DTWNCDON1_GL(I,K)+DTWNCDON2_GL(I,K)+DTWNCDON3_GL(I,K))*86400,I=1,MGL),&						   !58
-						  (DTNH4_GL(I,K),I=1,MGL),  &																	   !59
-						  (DTNO3_GL(I,K),I=1,MGL),  & 									!									60
-						  (DTLPON_GL(I,K),I=1,MGL),    &!																	61
-						  (DTRPON_GL(I,K),I=1,MGL),  & !																    62
-						   
-						  
+						  (ALGDON_GL(I,K),I=1,MGL),   &   ! Algae DON production (exudation and predation) 			25
+						  (ALGPON_GL(I,K),I=1,MGL),   &   ! Algae PON production (exudation and predation) 			26
+              (ALGNH4_GL(I,K),I=1,MGL),   &   ! Algae NH4 balance (uptake/excretion/predation) 			27
+              
+						  (ALGNO3_GL(I,K),I=1,MGL),   &   ! Algae NO3 Uptake 										28
+						  (DENNO3_GL(I,K),I=1,MGL),   &   ! Denitrification loss of NO3								29		
+              (NT_GL(I,K),I=1,MGL),     & ! Loss of Nh4 due to nitrification, production of NO3 		30
+            
+						  (DENITN_GL(I,K),I=1,MGL),  & !remin of DON due to denitrification  (makes NH4)       		31
+						  (HDRLPON_GL(I,K),I=1,MGL), & ! hydrolytic loss of LPON to DON                     		32
+              (HDRRPON_GL(I,K),I=1,MGL), & ! hydrolytic loss of RPON to DON                        		33
+              
+              (COAGN_GL(I,K),I=1,MGL),  & ! coagulation of DON3 to RPON 								34
+						  (MNLDON1_GL(I,K),I=1,MGL), & ! remin of DON 1 											35
+              (MNLDON2_GL(I,K),I=1,MGL), & ! remin of DON 2 											36			
+              
+						  (MNLDON3_GL(I,K),I=1,MGL), & ! remin of DON 3 											37
+						  (C2_GL(I,K,18),I=1,MGL),   & ! LPON 														38
+              (C2_GL(I,K,19),I=1,MGL),   & ! RPON 														39
+              
+						  (DTWCDON1_GL(I,K),I=1,MGL),&		!														40
+						  (DTWCDON2_GL(I,K),I=1,MGL),&!																41
+              (DTWCDON3_GL(I,K),I=1,MGL), &	!														    42
+              
+						  (DTWNCDON1_GL(I,K),I=1,MGL),&!															43
+						  (DTWNCDON2_GL(I,K),I=1,MGL),&!															44	
+              (DTWNCDON3_GL(I,K),I=1,MGL),&	! 															45
+              
+						  (DTNH4_GL(I,K),I=1,MGL),  &	!															46
+              (DTNO3_GL(I,K),I=1,MGL),  & 	!								!							47
+              
+						  (DTLPON_GL(I,K),I=1,MGL),    &!															48
+						  (DTRPON_GL(I,K),I=1,MGL),  & !															49
+ 
 				!!!Carbon	
-						  (ALGDOC_GL(I,K),I=1,MGL),   &   ! Algae DOC production (exudation and predation) g N m^-3 d^-1	63
-						  (ALGPOC_GL(I,K),I=1,MGL),   &   ! Algae POC production (exudation and predation) g N m^-3 d^-1	64	
-						  (DENIT_GL(I,K),I=1,MGL),   & ! denitrification remin of DOC g C m^-3 d^-1     					65
-						  (HDRLPOC_GL(I,K),I=1,MGL),  & ! Hydrolysis of LPOC to DOC g C m^-3 d^-1							66
-						  (HDRRPOC_GL(I,K),I=1,MGL),  & ! Hydrolysis of RPOC to DOC g C m^-3 d^-1							67	  
-						  (COAGC_GL(I,K),I=1,MGL),   & ! coagulation of DOC3 to RPOC g C m^-3 d^-1							68						  
-						  (MNLDOC1_GL(I,K),I=1,MGL), & ! remin of DOC 1 g C m^-3 d^-1										69
-						  (MNLDOC2_GL(I,K),I=1,MGL), & ! remin of DOC 2 g C m^-3 d^-1										70				
-						  (MNLDOC3_GL(I,K),I=1,MGL), & ! remin of DOC 3 g C m^-3 d^-1										71
-						  ((DTWCDOC1_GL(I,K)+DTWCDOC2_GL(I,K)+DTWCDOC3_GL(I,K) &! change in DOC over time, g C m^-3 d^-1	72											!			68
-						   + DTWNCDOC1_GL(I,K)+DTWNCDOC2_GL(I,K)+DTWNCDOC3_GL(I,K))*86400,I=1,MGL),& 
-							(DTLPOC_GL(I,K),I=1,MGL) ,   & !															   !73
-							(DTRPOC_GL(I,K),I=1,MGL),   & 								!								    74
-
+						  (ALGDOC_GL(I,K),I=1,MGL),   &   ! Algae DOC production (exudation and predation) 			50
+						  (ALGPOC_GL(I,K),I=1,MGL),   &   ! Algae POC production (exudation and predation) 			51	
+              (DENIT_GL(I,K),I=1,MGL),   & ! denitrification remin of DOC 								52
+              
+						  (HDRLPOC_GL(I,K),I=1,MGL),  & ! Hydrolysis of LPOC to DOC 								53
+						  (HDRRPOC_GL(I,K),I=1,MGL),  & ! Hydrolysis of RPOC to DOC 								54	  
+              (COAGC_GL(I,K),I=1,MGL),   & ! coagulation of DOC3 to RPOC 								55	
+              					  
+						  (MNLDOC1_GL(I,K),I=1,MGL), & ! remin of DOC 1 											56
+						  (MNLDOC2_GL(I,K),I=1,MGL), & ! remin of DOC 2 											57				
+              (MNLDOC3_GL(I,K),I=1,MGL), & ! remin of DOC 3 											58
+              
+						  (DTWCDOC1_GL(I,K), I=1,MGL), & !															59
+						  (DTWCDOC2_GL(I,K), I=1,MGL), &!															60
+              (DTWCDOC3_GL(I,K), I=1,MGL), &!															61
+            
+						  (DTWNCDOC1_GL(I,K), I=1,MGL), &!															62
+						  (DTWNCDOC2_GL(I,K), I=1,MGL), &!															63
+						  (DTWNCDOC3_GL(I,K), I=1,MGL), & !															64	
+						  
+						  (DTLPOC_GL(I,K),I=1,MGL) ,   & !														65
+						  (DTRPOC_GL(I,K),I=1,MGL),   & 								!							66
 		 
 ! ==================== Photochemistry ==================================						 
 						 
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,1),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC2 g C m^-3 d^-1 75
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,2),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC1 				76 
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,3),I=1,MGL),&! Phototransformation from CDOC3 --> DIC g C m^-3 d^-1   77
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,4),I=1,MGL),&! Phototransformation from CDOC3 --> NCDOC 				78		 
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,5),I=1,MGL),&! Phototransformation from CDOC2 --> CDOC1 g C m^-3 d^-1 79
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,6),I=1,MGL),&! Phototransformation from CDOC2 --> DIC					80	
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,7),I=1,MGL),&! Phototransformation from CDOC2 --> CNDOC g C m^-3 d^-1 81
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,8),I=1,MGL),&! Phototransformation from CDOC1 --> DIC 				82
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,9),I=1,MGL), & ! Phototransformation from CDOC1 --> NCDOC 			    83
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,1),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC2 		67
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,2),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC1 		68	
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,3),I=1,MGL),&! Phototransformation from CDOC3 --> DIC 		69
+              (PHOTOCHEM_DOC_ACCUM_GL(I,K,4),I=1,MGL),&! Phototransformation from CDOC3 --> NCDOC 		70
+              				 
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,5),I=1,MGL),&! Phototransformation from CDOC2 --> CDOC1 		71
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,6),I=1,MGL),&! Phototransformation from CDOC2 --> DIC			72	
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,7),I=1,MGL),&! Phototransformation from CDOC2 --> CNDOC 		73
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,8),I=1,MGL),&! Phototransformation from CDOC1 --> DIC 		74		
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,9),I=1,MGL), & ! Phototransformation from CDOC1 --> NCDOC 	75
 						  !transformation of nitrogen
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,10),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC2 g C m^-3 d^-1 75
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,11),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC1 				76 
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,12),I=1,MGL),&! Phototransformation from CDOC3 --> DIC g C m^-3 d^-1   77
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,13),I=1,MGL),&! Phototransformation from CDOC3 --> NCDOC 				78		 
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,14),I=1,MGL),&! Phototransformation from CDOC2 --> CDOC1 g C m^-3 d^-1 79
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,15),I=1,MGL),&! Phototransformation from CDOC2 --> DIC					80	
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,16),I=1,MGL),&! Phototransformation from CDOC2 --> CNDOC g C m^-3 d^-1 81
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,17),I=1,MGL),&! Phototransformation from CDOC1 --> DIC 				82
-						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,18),I=1,MGL) ! Phototransformation from CDOC1 --> NCDOC
-						  
-						  !(ALGPPDOC_GL(I,K),I=1,MGL),   & ! Primary Production DOC exudation, g C m^-3 d^-1   84
-						  !(ALGPredDOC_GL(I,K),I=1,MGL),  & ! Algae predation sloppy feeding DOC g C m^-3 d^-1   85
-						  !(ALGPPDON_GL(I,K),I=1,MGL),   & ! Primary Production DON exudation, g C m^-3 d^-1   86
-						  !(ALGPredDON_GL(I,K),I=1,MGL)  ! Algae predation sloppy feeding DON g C m^-3 d^-1   87					  
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,10),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC2 		76
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,11),I=1,MGL),&! Phototransformation from CDOC3 --> CDOC1 		77
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,12),I=1,MGL),&! Phototransformation from CDOC3 --> DIC 		78
+              (PHOTOCHEM_DOC_ACCUM_GL(I,K,13),I=1,MGL),&! Phototransformation from CDOC3 --> NCDOC 		79
+              		 
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,14),I=1,MGL),&! Phototransformation from CDOC2 --> CDOC1 		80
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,15),I=1,MGL),&! Phototransformation from CDOC2 --> DIC		81	
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,16),I=1,MGL),&! Phototransformation from CDOC2 --> CNDOC 		82
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,17),I=1,MGL),&! Phototransformation from CDOC1 --> DIC 		83
+						  (PHOTOCHEM_DOC_ACCUM_GL(I,K,18),I=1,MGL) ! Phototransformation from CDOC1 --> NCDOC		84
+				  
 						  
             !write sediment diagenesis model outputs   !LBcomment
          !IF(SEDIMENT_CALC .AND. K.eq.KBM1)THEN 

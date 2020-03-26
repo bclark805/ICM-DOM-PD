@@ -3,7 +3,7 @@
 #-----------BEGIN MAKEFILE-------------------------------------------------
             SHELL         = /bin/bash
             DEF_FLAGS     = -P  -C -traditional 
-            EXEC          =./wqm_dom4_NCDF
+            EXEC          =./wqm_dom4_Fast
 #==========================================================================
 #  BEGIN USER DEFINITION SECTION
 #==========================================================================
@@ -24,11 +24,11 @@
 
               FLAG_1 = -DMULTIPROCESSOR
 #              PARLIB = -L/hosts/salmon01/data00/medm/lib -lmetis 
-	       PARLIB = -L/data/users/bclark/chesfvm/METIS_source -lmetis
+	       PARLIB = -L/Users/jbclark8/Desktop/fvcom43-master/METIS_source -lmetis
 
 
-		MKLLIB = -L/opt/intel/mkl/lib/intel64
-		MKLINC = -I/opt/intel/mkl/include/intel64/ilp64 -I/opt/intel/mkl/include
+#		MKLLIB = -L/opt/intel/mkl/lib/intel64
+#		MKLINC = -I/opt/intel/mkl/include/intel64/ilp64 -I/opt/intel/mkl/include
 #--------------------------------------------------------------------------
 #        NETCDF OUTPUT      DUMP OUTPUT INTO NETCDF FILES (yes/no)
 #                           REQUIRES SYSTEM DEPENDENT NETCDF LIBRARIES
@@ -39,8 +39,8 @@
 #                           UNCOMMENT TO INCLUDE NETCDF OUTPUT CAPABILITY
 #--------------------------------------------------------------------------
            FLAG_2       =  -DNETCDF_IO
-           IOLIBS       =  -L/usr/local/netcdf-3.6.1-intel/lib/  -lnetcdf
-           IOINCS       =  -I/usr/local/netcdf-3.6.1-intel/include/
+           IOLIBS       =  -L/Users/jbclark8/Desktop/fvcom43-master/netcdf/lib -lnetcdf
+           IOINCS       =  -I/Users/jbclark8/Desktop/fvcom43-master/netcdf/include
 
 #-------------------------------------------------------------------------
 #        Optional calculatson for the sediment and water column
@@ -52,8 +52,9 @@
 
            FLAG_3        = -DSEDIMENT_DOM   
  
-            FLAG_4        = -DPHOTODEGRADATION
-            FLAG_5        = -DBUDGET
+           FLAG_4        = -DPHOTODEGRADATION
+           FLAG_5        = -DBUDGET
+	       FLAG_6        = -DXFLUX_FLAG
 #--------------------------------------------------------------------------
 #        SELECT COMPILER/PLATFORM SPECIFIC DEFINITIONS
 #          SELECT FROM THE FOLLOWING PLATFORMS OR USE "OTHER" TO DEFINE
@@ -78,13 +79,14 @@
 #--------------------------------------------------------------------------
           CPP      = /usr/bin/cpp
           CPPFLAGS = $(DEF_FLAGS) -DINTEL -DDOUBLE_PRECISION 
-          FC       =  mpiifort 
+          FC       =  mpifort 
         #  DEBFLGS = -g
-        # DEBFLGS  = -r8 -i4 -g  -O0  -check all -g -debug -ftrapuv -debug-parameters -fp-stack-check -fpe0 -traceback -automatic -warn all
+          # DEBFLGS  = -heap-arrays -r8 -i4 -g  -O0  -check all -g -debug  -debug-parameters -fp-stack-check -traceback -automatic -warn all -ftrapuv#-fpe0 
    #       OPT      = -i4 -traceback -heap-arrays  -O2 -vec-report0 -r8 -xHost -no-prec-div  -no-prec-sqrt -assume nominus0 -assume noprotect_parens -assume norealloc_lhs  -shared-intel # -warn unused -check uninit #  -p -g  -fno-inline-functions
           OPT      = -DUSE_U_INT_FOR_XDR -DHAVE_RPC_RPC_H=1  #-O3 -xN -axN -tpp7
-          #OPT      = -O3 #-xN -axN -tpp7
-          OPT = -traceback -heap-arrays  -i4 -O3 -vec-report0 -r8 -xHost -no-prec-div  -no-prec-sqrt -assume nominus0 -assume noprotect_parens -assume norealloc_lhs  -shared-intelLIB 
+         # OPT      = -O3 #-xN -axN -tpp7
+          OPT = -O2 -heap-arrays -traceback -i4 -r8 -fp-model fast=2 -xHost -no-prec-div -no-prec-sqrt -assume nominus0 -assume protect_parens -assume norealloc_lhs
+    #      OPT = -traceback -heap-arrays  -i4 -O3 -vec-report0 -r8 -xHost -no-prec-div  -no-prec-sqrt -assume nominus0 -assume noprotect_parens -assume norealloc_lhs  -shared-intelLIB 
 
   #       CLIB     = -static-libcxa 
 #--------------------------------------------------------------------------
@@ -115,7 +117,7 @@
 #--------------------------------------------------------------------------
 #  CAT Preprocessing Flags
 #--------------------------------------------------------------------------
-           CPPARGS = $(CPPFLAGS) $(DEF_FLAGS) $(FLAG_1) $(FLAG_2) $(FLAG_3) $(FLAG_4)  $(FLAG_5)
+           CPPARGS = $(CPPFLAGS) $(DEF_FLAGS) $(FLAG_1) $(FLAG_2) $(FLAG_3) $(FLAG_4) $(FLAG_5) $(FLAG_6)
 #--------------------------------------------------------------------------
 #  Libraries           
 #--------------------------------------------------------------------------
@@ -143,11 +145,11 @@
 MAIN  = mod_prec.F	mod_types.F	mod_utils.F	mod_control.F	\
 	mod_lims.F	mod_bcs.F	mod_sizes.F	mod_hydrovars.F	\
 	mod_buffers.F 	mod_fileinfo.F	      mod_inp.F  \
-	mod_wqm.F	mod_zoop.F	mod_wqminit.F\
+	mod_wqm.F	mod_zoop.F	mod_wqminit.F mod_output_flux.F\
 	utilities.F	mod_par.F	mod_sed_sav_exchange_vars.F	\
 	bracket.F	mod_sed_sf_exchange_vars.F	mod_sf.F	\
 	mod_sed_df_exchange_vars.F	mod_df.F	   mod_wc_dom.F \
-	mod_sed_dom_exchange.F          mod_sed_dom.F   mod_owq.F	 \
+	mod_sed_dom_exchange.F  mod_sed_dom.F   mod_owq.F	 \
 	mod_sav.F	mod_ba.F	mod_sed.F	mod_algal.F	\
 	mod_bcmap.F	mod_obcs.F	mod_ncd.F	ncdio.F		\
 	mod_tge.F	cell_area.F	pdomdec.F			\

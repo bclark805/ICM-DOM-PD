@@ -216,7 +216,7 @@ REAL(SP), ALLOCATABLE :: MASSTEMP(:),  &
 					   FRACTEMP(:),  &
 					   EX_TEMP(:), &!
 					   PSTY_TEMP(:), DNSTY_TEMP(:),  &! 
-					   DOM_INITIAL_TEMP(:),DOM_INITIAL(:)  ! B Clark,
+					   DOM_INITIAL_TEMP(:,:),DOM_INITIAL(:,:)  ! B Clark,
 					   !temporary solution to see if a spatially variant settling rate helps with the NH4 fluxes out of sediments
 
 INTEGER, DIMENSION(:),ALLOCATABLE  ::   NMARSHNODE           ! node number from input file
@@ -932,7 +932,7 @@ IMPLICIT NONE
        ALLOCATE(EX_TEMP(MGL))
        ALLOCATE(PSTY_TEMP(MGL))
 	   ALLOCATE(DNSTY_TEMP(MGL))
-	   ALLOCATE(DOM_INITIAL_TEMP(MGL))
+	   ALLOCATE(DOM_INITIAL_TEMP(MGL,6))
 	   
 	   ALLOCATE(NMARSHNODE(MTLOC))
        ALLOCATE(MARSH_FRAC(MTLOC))
@@ -940,7 +940,7 @@ IMPLICIT NONE
        ALLOCATE(P_EX_RATE(MTLOC))
 	   ALLOCATE(PSTY(MTLOC))
 	   ALLOCATE(DNSTY(MTLOC))
-	    ALLOCATE(DOM_INITIAL(MTLOC))
+	    ALLOCATE(DOM_INITIAL(MTLOC,6))
 	   
 	   ALLOCATE(SED_ADV(MTLOC))
 	   
@@ -948,7 +948,11 @@ read(1111,*)  ! skip two lines
 read(1111,*)
 
     DO I=1,NMARSHTOTAL
-       READ(1111,*) NMNTEMP(I),MASSTEMP(I),FRACTEMP(I),EX_TEMP(I),PSTY_TEMP(I),DNSTY_TEMP(I),DOM_INITIAL_TEMP(I)
+	   READ(1111,*) NMNTEMP(I),MASSTEMP(I),FRACTEMP(I),EX_TEMP(I),PSTY_TEMP(I),DNSTY_TEMP(I), & 
+	   DOM_INITIAL_TEMP(I,1),DOM_INITIAL_TEMP(I,2),DOM_INITIAL_TEMP(I,3), &
+	   DOM_INITIAL_TEMP(I,4),DOM_INITIAL_TEMP(I,5),DOM_INITIAL_TEMP(I,6)
+!       write(*,*)DOM_INITIAL_TEMP(I,1),DOM_INITIAL_TEMP(I,2),DOM_INITIAL_TEMP(I,3), &
+!	   DOM_INITIAL_TEMP(I,4),DOM_INITIAL_TEMP(I,5),DOM_INITIAL_TEMP(I,6)
     END DO
 
 
@@ -974,7 +978,7 @@ read(1111,*)
         P_EX_RATE(I) = EX_TEMP(NGID(I))
 		PSTY(I) = PSTY_TEMP(NGID(I))
 		DNSTY(I) = DNSTY_TEMP(NGID(I))
-		DOM_INITIAL(I) = DOM_INITIAL_TEMP(NGID(I))  ! DOM initial Condition
+		DOM_INITIAL(I,:) = DOM_INITIAL_TEMP(NGID(I),:)  ! DOM initial Condition
 
         !IF(MARSH_FRAC(I) > 0)THEN
         !      write(*,*)'Exudation Tempcon = ',EXRATE_TEMPCON
@@ -994,7 +998,7 @@ read(1111,*)
          P_EX_RATE(I+MLOC)  = EX_TEMP(HN_LST(I))
 		 PSTY(I+MLOC)=PSTY_TEMP(HN_LST(I))  ! The sediment porosity  should be < 1 if sediment is more porous than basal rate, > 1 if less porous than basal rate
 		 DNSTY(I+MLOC)=DNSTY_TEMP(HN_LST(I))
-		 DOM_INITIAL(I+MLOC)=DOM_INITIAL_TEMP(HN_LST(I))
+		 DOM_INITIAL(I+MLOC,:)=DOM_INITIAL_TEMP(HN_LST(I),:)
       ENDDO
 	 ENDIF
 	 IF(MSR) THEN
@@ -1104,61 +1108,46 @@ ENDIF
 	 
 DO I = 1,MLOC
        ! B Clark hardwired the initial dom to always be 20 
-      DOM_INITIAL(I)=DOM_INITIAL(I)!*MARSH_FRAC(I) + 20.   ! Make the subtidal DOM
+ !     DOM_INITIAL(I)=DOM_INITIAL(I)*MARSH_FRAC(I) + 20.   ! Make the subtidal DOM
                                                         !always start at 20 mg C
                                                         !L^-1 
 
-	CDOC1(I) = DOM_INITIAL(I) * CDOCFRAC* 0.1!hardwire that 0.1 percent of the DOM is labile, 0.2 is semilabile and 0.7 is refractory, can make it input later
-	CDOC2(I) = DOM_INITIAL(I) * CDOCFRAC* 0.2!
-	CDOC3(I) = DOM_INITIAL(I) * CDOCFRAC* 0.7!
-    NCDOC1(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.1!
-	NCDOC2(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.2!
-	NCDOC3(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.7!
+	CDOC1(I) = DOM_INITIAL(I,1)! * CDOCFRAC* 0.1!hardwire that 0.1 percent of the DOM is labile, 0.2 is semilabile and 0.7 is refractory, can make it input later
+	CDOC2(I) = DOM_INITIAL(I,2) !* CDOCFRAC* 0.2!
+	CDOC3(I) = DOM_INITIAL(I,3) !* CDOCFRAC* 0.7!
+    NCDOC1(I) = DOM_INITIAL(I,4) !* NCDOCFRAC* 0.1!
+	NCDOC2(I) = DOM_INITIAL(I,5) !* NCDOCFRAC* 0.2!
+	NCDOC3(I) = DOM_INITIAL(I,6) !* NCDOCFRAC* 0.7!
 
 !NITROGEN
-	CDON1(I) = DOM_INITIAL(I) * CDOCFRAC* 0.1 * M_NTOC
-	CDON2(I) = DOM_INITIAL(I) * CDOCFRAC* 0.2 * M_NTOC
-    CDON3(I) = DOM_INITIAL(I) * CDOCFRAC* 0.7 * M_NTOC
+	CDON1(I) = DOM_INITIAL(I,1) * M_NTOC!* CDOCFRAC* 0.1 
+	CDON2(I) = DOM_INITIAL(I,2) * M_NTOC!* CDOCFRAC* 0.2 * M_NTOC
+    CDON3(I) = DOM_INITIAL(I,3) * M_NTOC!* CDOCFRAC* 0.7 * M_NTOC
 
-	NCDON1(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.1 * M_NTOC
-	NCDON2(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.2 * M_NTOC
-	NCDON3(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.7 * M_NTOC
+	NCDON1(I) = DOM_INITIAL(I,4) * M_NTOC!* NCDOCFRAC* 0.1 * M_NTOC
+	NCDON2(I) = DOM_INITIAL(I,5)* M_NTOC !* NCDOCFRAC* 0.2 * M_NTOC
+	NCDON3(I) = DOM_INITIAL(I,6) * M_NTOC!* NCDOCFRAC* 0.7 * M_NTOC
 
 !PHOSPHORUS
-	CDOP1(I) = DOM_INITIAL(I) * CDOCFRAC* 0.1 * M_PTOC	
-	CDOP2(I) = DOM_INITIAL(I) * CDOCFRAC* 0.2 * M_PTOC
-	CDOP3(I) = DOM_INITIAL(I) * CDOCFRAC* 0.7 * M_PTOC
+	CDOP1(I) = DOM_INITIAL(I,1) * M_PTOC!* CDOCFRAC* 0.1 * M_PTOC	
+	CDOP2(I) = DOM_INITIAL(I,2)* M_PTOC !* CDOCFRAC* 0.2 * M_PTOC
+	CDOP3(I) = DOM_INITIAL(I,3) !* CDOCFRAC* 0.7 * M_PTOC
 	
-	NCDOP1(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.1 * M_PTOC
-	NCDOP2(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.2 * M_PTOC
-	NCDOP3(I) = DOM_INITIAL(I) * NCDOCFRAC* 0.7 * M_PTOC	
-         
-! set first layer same as second layer
-  !      CDOC11(I)=CDOC1(I)
-  !      CDOC21(I)=CDOC2(I)
-  !      CDOC31(I)=CDOC3(I)
-  !      NCDOC11(I)=NCDOC1(I)
-  !      NCDOC21(I)=NCDOC2(I)
-  !      NCDOC31(I)=NCDOC3(I)
-  !      CDON11(I)=CDON1(I)
-  !      CDON21(I)=CDON2(I)
-  !      CDON31(I)=CDON3(I)
-  !      NCDON11(I)=NCDON1(I)
-  !      NCDON21(I)=NCDON2(I)
-  !      NCDON31(I)=NCDON3(I)
-
-   !     CDOP11(I)=CDOP1(I)
-   !     CDOP21(I)=CDOP2(I)
-   !     CDOP31(I)=CDOP3(I)
-   !     NCDOP11(I)=NCDOP1(I)
-   !     NCDOP21(I)=NCDOP2(I)
-   !     NCDOP31(I)=NCDOP3(I)
+	NCDOP1(I) = DOM_INITIAL(I,4)* M_PTOC !* NCDOCFRAC* 0.1 * M_PTOC
+	NCDOP2(I) = DOM_INITIAL(I,5)* M_PTOC !* NCDOCFRAC* 0.2 * M_PTOC
+	NCDOP3(I) = DOM_INITIAL(I,6)* M_PTOC !* NCDOCFRAC* 0.7 * M_PTOC	        
 
 ENDDO
 
-!DOM_INITIAL=0.0
-
-write(*,*)'DOM inital is ',DOM_INITIAL(352)
+! !DOM_INITIAL=0.0
+! IF(MSR) THEN
+! 	write(*,*)'CDOC1 inital is ',DOM_INITIAL(352,1)
+! 	write(*,*)'CDOC2 inital is ',DOM_INITIAL(352,2)
+! 	write(*,*)'CDOC3 inital is ',DOM_INITIAL(352,3)
+! 	write(*,*)'NCDOC1 inital is ',DOM_INITIAL(352,4)
+! 	write(*,*)'NCDOC2 inital is ',DOM_INITIAL(352,5)
+! 	write(*,*)'NCDOC3 inital is ',DOM_INITIAL(352,6)
+! ENDIF
 
 
     221 format(6/,L8) 
@@ -1523,7 +1512,7 @@ END IF
 	
     EXRATE = GET_ZHTA(P_EX_RATE(I),SED_TEMP(I),EXRATE_TEMPCON)	
 !EXRATE = 0.0  ! B Clark temp adtiion to get more DOm into marsh sediments	
-	JMDOM = MARSH_MASS(I)*MARSH_FRAC(I)*EXRATE!*0.1  ! we will only loop over the marsh nodes, but will have MDOM be defined globally
+	JMDOM = MARSH_MASS(I)*MARSH_FRAC(I)*EXRATE!*0.  ! we will only loop over the marsh nodes, but will have MDOM be defined globally
 !write(*,*)'JMDOM = ',JMDOM
 !FRACTIONATION OF OUR DOM INTO COLORED AND NON COLORED PARTS
 	JCMDOC(I)  = CDOCFRAC*JMDOM       !flux of cdom and ncdom from the marshes
@@ -1869,31 +1858,30 @@ Diffusion_distance=(HSED1_SHARE(I)+D(I)*DZ(KBM1))*0.5
 	 
 !!********************** Acummulate fluxes over time **************************
 
-!!#if(ACCUMULATE_FLUXES)	 
-!	 	 
-!	JDOM_OUT(I,1)= JDOM_OUT(I,1)+JWCDOC1(I) * DT * ART1(I)   ! time and area integrate the flux to get g m^-2 d^-1 ---> g 
-!	JDOM_OUT(I,2)= JDOM_OUT(I,2)+JWCDOC2(I) * DT * ART1(I) 	 
-!	JDOM_OUT(I,3)= JDOM_OUT(I,3)+JWCDOC3(I) * DT * ART1(I) 	 
-!	JDOM_OUT(I,4)= JDOM_OUT(I,4)+JWNCDOC1(I) * DT * ART1(I) 	 
-!	JDOM_OUT(I,5)= JDOM_OUT(I,5)+JWNCDOC2(I) * DT * ART1(I) 
-!	JDOM_OUT(I,6)= JDOM_OUT(I,6)+JWNCDOC3(I) * DT * ART1(I) 
-!	JDOM_OUT(I,7)= JDOM_OUT(I,7)+JWCDON1(I) * DT * ART1(I) 
-!	JDOM_OUT(I,8)= JDOM_OUT(I,8)+JWCDON2(I) * DT * ART1(I) 
-!	JDOM_OUT(I,9)= JDOM_OUT(I,9)+JWCDON3(I) * DT * ART1(I) 
-!	JDOM_OUT(I,10)= JDOM_OUT(I,10)+JWNCDON1(I) * DT * ART1(I) 
-!	JDOM_OUT(I,11)= JDOM_OUT(I,11)+JWNCDON2(I) * DT * ART1(I) 
-!	JDOM_OUT(I,12)= JDOM_OUT(I,12)+JWNCDON3(I) * DT * ART1(I) 
-!	JDOM_OUT(I,13)= JDOM_OUT(I,13)+JWCDOP1(I) * DT * ART1(I) 
-!	JDOM_OUT(I,14)= JDOM_OUT(I,14)+JWCDOP2(I) * DT * ART1(I) 
-!	JDOM_OUT(I,15)= JDOM_OUT(I,15)+JWCDOP3(I) * DT * ART1(I) 
-!	JDOM_OUT(I,16)= JDOM_OUT(I,16)+JWNCDOP1(I) * DT * ART1(I) 
-!	JDOM_OUT(I,17)= JDOM_OUT(I,17)+JWNCDOP2(I) * DT * ART1(I) 
-!	JDOM_OUT(I,18)= JDOM_OUT(I,18)+JWNCDOP3(I) * DT * ART1(I) 
-!!	write(*,*) 'JDOM_Out = ',JDOM_OUT(I,1)
-!	
-!#else	
+#if defined(BUDGET)	
+	 !Accumulate the total flux across the sediment water interface for each cell
+	JDOM_OUT(I,1)= JDOM_OUT(I,1)+JWCDOC1(I)*DT* ART1(I)/1E3!get the instantaneous flux accross the interface for output
+	JDOM_OUT(I,2)= JDOM_OUT(I,2)+JWCDOC2(I)*DT* ART1(I)/1E3! * DLTS * ART1 	 
+	JDOM_OUT(I,3)= JDOM_OUT(I,3)+JWCDOC3(I)*DT* ART1(I)/1E3 !* DLTS * ART1 	 
+	JDOM_OUT(I,4)= JDOM_OUT(I,4)+JWNCDOC1(I) *DT* ART1(I)/1E3!* DLTS * ART1 	 
+	JDOM_OUT(I,5)= JDOM_OUT(I,5)+ JWNCDOC2(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,6)=  JDOM_OUT(I,6)+JWNCDOC3(I) *DT* ART1(I)/1E3!* DLTS * ART1 
+	JDOM_OUT(I,7)= JDOM_OUT(I,7)+JWCDON1(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,8)= JDOM_OUT(I,8)+JWCDON2(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,9)= JDOM_OUT(I,9)+JWCDON3(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,10)= JDOM_OUT(I,10)+JWNCDON1(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,11)=JDOM_OUT(I,11)+ JWNCDON2(I)*DT* ART1(I)/1E3 !* DLTS * ART1 
+	JDOM_OUT(I,12)=JDOM_OUT(I,12)+ JWNCDON3(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,13)=JDOM_OUT(I,13)+ JWCDOP1(I)*DT* ART1(I)/1E3 !* DLTS * ART1 
+	JDOM_OUT(I,14)=JDOM_OUT(I,14)+ JWCDOP2(I)*DT* ART1(I)/1E3 !* DLTS * ART1 
+	JDOM_OUT(I,15)=JDOM_OUT(I,15)+ JWCDOP3(I)*DT* ART1(I)/1E3 !* DLTS * ART1 
+	JDOM_OUT(I,16)=JDOM_OUT(I,16)+ JWNCDOP1(I)*DT* ART1(I)/1E3 !* DLTS * ART1 
+	JDOM_OUT(I,17)= JDOM_OUT(I,17)+JWNCDOP2(I)*DT* ART1(I)/1E3! * DLTS * ART1 
+	JDOM_OUT(I,18)= JDOM_OUT(I,18)+JWNCDOP3(I)*DT* ART1(I)/1E3 !* DLTS * ART1 
 	
-	JDOM_OUT(I,1)= JWCDOC1(I) !* DLTS * ART1   !get the instantaneous flux accross the interface for output
+
+#else
+    JDOM_OUT(I,1)= JWCDOC1(I)!*DT* ART1(I)!get the instantaneous flux accross the interface for output
 	JDOM_OUT(I,2)= JWCDOC2(I)! * DLTS * ART1 	 
 	JDOM_OUT(I,3)= JWCDOC3(I) !* DLTS * ART1 	 
 	JDOM_OUT(I,4)= JWNCDOC1(I) !* DLTS * ART1 	 
@@ -1910,37 +1898,17 @@ Diffusion_distance=(HSED1_SHARE(I)+D(I)*DZ(KBM1))*0.5
 	JDOM_OUT(I,15)= JWCDOP3(I) !* DLTS * ART1 
 	JDOM_OUT(I,16)= JWNCDOP1(I) !* DLTS * ART1 
 	JDOM_OUT(I,17)= JWNCDOP2(I)! * DLTS * ART1 
-	JDOM_OUT(I,18)= JWNCDOP3(I) !* DLTS * ART1 
-
+	JDOM_OUT(I,18)= JWNCDOP3(I) !* DLTS * ART1  	
+#endif
 !#endif
 
-!**********************COLLECT WATER COLUMN FLUXES **********************
+ !**********************COLLECT WATER COLUMN FLUXES **********************
 	 
 ! Gather the fluxes that are going to the water column via diffusion 
 ! into labile and refractory portions
 ! THERE WILL EVENTUALLY BE COLORED AND NON-COLORED CARBON IN THE WATER COLUMN
 ! BUT FOR NOW ALL OF THE DOM WILL BE 'NON-COLORED'
-
-! this is obsolete, now we can pass the flux directly to the water column	 
-!!UNITS = g /m^2/day
-!	 
-!J_LDOC_SHARE(I)=(JWCDOC1+JWNCDOC1) +   &    ! ALL OF THE G1 CARBON IS LABILE IN THE WATER COLUMN
-!				(JWCDOC2+JWNCDOC2)*WFDOM3!,   & ! SOME FRACTION OF G2 IS LABILE
-!				
-!J_RDOC_SHARE(I)=(JWCDOC2+JWNCDOC2)*(1-WFDOM3) +  &   ! SOME FRACTION OF G2 CARBON IS REFRACTORY
-!				(JWCDOC3+JWNCDOC3)                   !IN THE WATER COLUMN	
-!				
-!J_LDON_SHARE(I)=(JWCDON1+JWNCDON1) +   &    !ORGANIC NITROGEN, SAME AS CARBON
-!				(JWCDON2+JWNCDON2)*WFDOM3   
-!				
-!J_RDON_SHARE(I)=(JWCDON2+JWNCDON2)*(1-WFDOM3) +  &   
-!				(JWCDON3+JWNCDON3)                   
-
-!J_LDOP_SHARE(I)=(JWCDOP1+JWNCDOP1) +   &    !ORGANIC PHOSPHORUS, SAME AS CARBON
-!				(JWCDOP2+JWNCDOP2)*WFDOM3   
-!				
-!J_RDOP_SHARE(I)=(JWCDOP2+JWNCDOP2)*(1-WFDOM3) +  &   
-!				(JWCDOP3+JWNCDOP3)       
+  
 
 
 !******************* END COLLECT WATER COLUMN FLUXES **********************				
@@ -2000,8 +1968,6 @@ Diffusion_distance=(HSED1_SHARE(I)+D(I)*DZ(KBM1))*0.5
 	
 ENDDO
 
-
-
    ! UPDATE THE SHARED ARRAYS FOR PASSING TO THE BIG SEDIMENT MODULE
 ! Take note of unit difference between layer 1 and layer 2
 ! Layer 1 is depth integrated in mod_sed with the depth of the aerobic layer
@@ -2055,17 +2021,6 @@ IMPLICIT none
    C1 = (TDOC_IN1 * A22  -  TDOC_IN2 * A12 ) / GAMMA    ! = Flux into layer 1 * A11  - 
 
    C2 = (- A21 * TDOC_IN1 + A11 * TDOC_IN2) / GAMMA
-   
-   !  write(*,*)'C2tm1 in solver = ',C2TM1
-   ! write(*,*)'C1tm1 in solver = ',C1TM1
-!	
-!	write(*,*) 'A21 = ',A21
-!	write(*,*) 'TDOC_In = ',TDOC_in1
-!	write(*,*) 'A11 = ',A11
-!	write(*,*)  'C2TM1 = ',C2TM1
-!	write(*,*)  'GAMMA = ',GAMMA
-   !write(*,*) ' C2 in solver  = ',C2
-   !write(*,*) ' C1 in solver  = ',C1
 
 END SUBROUTINE DDOM_SOLVER
 
@@ -2074,11 +2029,6 @@ END SUBROUTINE DDOM_SOLVER
 REAL FUNCTION GET_ZHTA(K_IN,TEMP,THETA_IN)
 use mod_prec, only: SP
 implicit none
-	! this function solves the temperature reactoin dependence for the diagenetic flux
-	! K_IN = REACTION RATE
-	! TEMP = TEMPERATURE
-	! THETA_IN = INITIAL THETA
-
 
 	REAL(SP) :: K_IN 
 	REAL(SP) :: THETA_IN  
@@ -2087,10 +2037,6 @@ implicit none
 
      TEMP20=TEMP-20.d0
      TEMP202=TEMP20/2.d0
-	 !write(*,*) 'K_in = ',k_in
-	 !write(*,*) 'theta in = ',theta_in
-	 !write(*,*)'Temp20 = ',temp20   ! B Clark Debug
-	 !write(*,*)'temp202 =',temp202
 		
      GET_ZHTA=K_IN*THETA_IN**TEMP20
 	!write(*,*)'temp function = ',get_zhta  ! B Clark Debug

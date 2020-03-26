@@ -262,7 +262,8 @@
    IF(NUMQBC > 0)THEN
      ALLOCATE(WDIS(NUMQBC,NCP))     ;WDIS   = ZERO
      CALL BRACKET(QBC_TM,THOUR,L1,L2,FACT,UFACT,IERR)
-      WDIS(:,:) = UFACT*DWDIS(:,:,L1) + FACT*DWDIS(:,:,L2)
+!        WDIS(:,:)=DWDIS(:,:,L1)
+       WDIS(:,:) = UFACT*DWDIS(:,:,L1) + FACT*DWDIS(:,:,L2)
    ENDIF
 
    IF(POINT_ST_TYPE == 'specified') THEN

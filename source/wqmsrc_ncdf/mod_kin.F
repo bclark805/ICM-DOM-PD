@@ -607,7 +607,7 @@ USE MOD_WQM, ONLY: ShearStress
 
    IMPLICIT NONE
    INTEGER :: I,K
-   REAL(SP),DIMENSION(1:MTLOC,KBM1) :: DTSSI, FLXSSSI    
+   REAL(SP),DIMENSION(0:MTLOC,KBM1) :: DTSSI, FLXSSSI    
    !REAL(SP) :: TaTAU_crit = 0.05 ! Pa; Critcal shear B Clark added June 2018 to calculate resuspension, need to read in at some point
    
 !******* Set special settling rate for high solids concs
@@ -716,7 +716,7 @@ USE MOD_WQM, ONLY: ShearStress
    REAL(SP) :: DOREF,FRLP,FRRP,ANCPSZ,   &  !NRRATE, CRRATE,PRRATE ! B clark pull out C,N and P zooplankton rates to make allocatable for passing into mod_wc_doc
            ANCPLZ,APCPSZ,APCPLZ,FRB1SZ,FRB2SZ,FRB3SZ,FRB1LZ,  &  !FRD1,FRD2, NOW DEFINED IN WC_DOM
 		   FRB2LZ,FRB3LZ
-   REAL(SP),DIMENSION(1:MTLOC,KBM1) :: DTSZ, DTLZ
+   REAL(SP),DIMENSION(0:MTLOC,KBM1) :: DTSZ, DTLZ
    INTEGER :: I,J,K,ITEMP
 
 ! DETERMINE JULIAN DAY
@@ -1244,7 +1244,7 @@ USE MOD_WQM, ONLY: ShearStress
    REAL(SP) ::    &  !DOCBM1, DOCBM2, DOCBM3, CP1, CP2, CP3, RDOC1, RDOC2, RDOC3, ! moved to mod_wc_doc and made into array where necessary
            RPOC1, RPOC2, RPOC3 , FDO1, FDO2, FDO3 ! ALGCAR, SALTC
    REAL(SP) :: DICBM,DICPR, RPSETL,FTN
-   REAL(SP),DIMENSION(1:MTLOC,KBM1) :: DTLPOC, DTRPOC, FLXSPOC!, ALGCAR!, COAG  !  DTLDOC, DTRDOC B Clark moved ALGCAR here to make array  
+   REAL(SP),DIMENSION(0:MTLOC,KBM1) :: DTLPOC, DTRPOC, FLXSPOC!, ALGCAR!, COAG  !  DTLDOC, DTRDOC B Clark moved ALGCAR here to make array  
 
  !  DTLDOC = 0.0
  !  DTRDOC = 0.0
@@ -1727,7 +1727,7 @@ USE MOD_WQM, ONLY: ShearStress
    REAL(SP):: DIN! B Clark added, Nh4+NO3
    REAL(SP) :: RPSETL! , SALTC!,  ALGCAR
    INTEGER :: I,K
-   REAL(SP),DIMENSION(1:MTLOC,KBM1) :: 	DTNH4, 		&!gN/m^3/sec
+   REAL(SP),DIMENSION(0:MTLOC,KBM1) :: 	DTNH4, 		&!gN/m^3/sec
 										DTNO3, 		&!gN/m^3/sec
 										!DTLDON, 	&!gN/m^3/sec     ! DON_flag
 										!DTRDON, 	&!gN/m^3/sec      ! DON_flag
@@ -2288,7 +2288,7 @@ USE MOD_WQM, ONLY: ShearStress
    REAL(SP) ::PFU, PPU, PFD, PPD, PO4SET, RPSETL, PIB1SETL,    &   ! ALGCAR, 
            PIB2SETL, PIB3SETL, PF, PP 
    INTEGER :: I, J, K
-   REAL(SP),DIMENSION(1:MTLOC,KBM1) :: DTPO4,  DTLPOP, DTRPOP,  &  ! DTLDOP, DTRDOP,
+   REAL(SP),DIMENSION(0:MTLOC,KBM1) :: DTPO4,  DTLPOP, DTRPOP,  &  ! DTLDOP, DTRDOP,
         DTPIP, DTPIB1, DTPIB2, DTPIB3, FLXSPO4, FLXSPOP, FLXSPIP
 
    DTPO4 = 0.0
@@ -3355,7 +3355,7 @@ USE MOD_WQM, ONLY: ShearStress
    IMPLICIT NONE
    INTEGER :: I,K
    REAL(SP) :: SUP, SP1, SP2, SP3, PFU, PF, SASETL,SUSETL 
-   REAL(SP),DIMENSION(1:MTLOC,KBM1) :: 	DTSIUPB,		&  !rate of change of particulate biogenic silica (unavaiable, gSi/m^3/sec)
+   REAL(SP),DIMENSION(0:MTLOC,KBM1) :: 	DTSIUPB,		&  !rate of change of particulate biogenic silica (unavaiable, gSi/m^3/sec)
 									DTSIAT,		&	!rate of change of avaiable total silica (avaiable, gSi/m^3/sec)
 									FLXSSI	
 
