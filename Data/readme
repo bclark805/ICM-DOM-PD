@@ -6,15 +6,9 @@ to generate a Carbon budget and other results from Clark et al.,
 
 "A comprehensive estuarine carbon budget and the importance of tidal marshes in estuarine biogeochemistry"
 
-The OutputData directory contains 4 sub-directories 
+The OutputData directory contains 2 Sub directories
 
-that each have matlab data structures that contain the carbon and nitrogen budget terms
-
-for the Rhode River, MD
-
-in addition, outputs for the difference between the model runs with and without the marsh
-
-are contained in OutputData
+That each have MATLAB data files that are used to generate some of the figures from the model using MATLAB
 
 The scripts in the Postprocessing directory were primarily used to generate the matlab data structures
 
