@@ -243,40 +243,19 @@
 
 !tykim commented out two lines below
 	    IF(NUTMIN-C2F(I,K,II) >  0.0_SP ) THEN
-	!   IF(NUTMIN-C2F(I,K,II) >  C2F(I,K,II)*0.01) THEN
-	!	IF(II==35 .or. II==27)THEN
-		! write(*,*)'Corrected variable that was too low ',II
-!		write(*,*)'For ii node, depth, before, after',ii,NGID(I),K,C2F(I,K,II),NUTMIN
-		! write(*,*)'And depth',K
-		! write(*,*)'Value before = ',C2F(I,K,II)
-!	     endif
+
 		 C2F(I,K,II) = NUTMIN
-		!  if(ii==35)THEN
-		!  write(*,*)'Value After = ',C2F(I,K,II)
-		!  endif
 
 		
        ENDIF
 	    IF(C2F(I,K,II)-NUTMAX >  0.0_SP ) THEN
-!	   IF(C2F(I,K,II)-NUTMAX >  C2F(I,K,II)*0.01)  THEN
-!		 if(II==35 .or. II==27)THEN
-!			write(*,*)'for II node, depth, before, after',II,NGID(I),K,C2F(I,K,II),NUTMAX
-	
-		! write(*,*)'Corrected variable that was too high' ,II
-		! write(*,*)'At node ',NGID(I)
-		! write(*,*)'And depth',K
-		! write(*,*)'Value before = ',C2F(I,K,II)
-!	     endif
+
 !
 		C2F(I,K,II) = NUTMAX
-		! if(ii==35)THEN
-		! write(*,*)'Value After = ',C2F(I,K,II)
-		! endif
+
 		
 	   ENDIF
 
-!       IF(NUTMIN-C2F(I,K,II) >  C2F(I,K,II)*0.001 ) C2F(I,K,II) = NUTMIN
-!       IF(C2F(I,K,II)-NUTMAX >  C2F(I,K,II)*0.001 ) C2F(I,K,II) = NUTMAX
       ENDDO
 
  200 CONTINUE
