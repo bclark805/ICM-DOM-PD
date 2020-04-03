@@ -623,39 +623,8 @@
 			!DTM should have unit of concentration/sec	
 			!DLT should have unit of sec, which is the time step
 			!cocnentration for each constituent is different,in general g/m^3
-			!
-		  
-!      ELSE
-!          	C1(I,K,II)=(C2(I,K,II)-XFLUX(I,K,II)*TMP1(I))*TMP2(I)
-!      ENDIF
-          
-!ORI        C1(I,K,II)=(C2(I,K,II)-XFLUX(I,K,II)/ART1(I)*(DLT/DT(I)))*   &
-!                         (DT(I)/DTFA(I))+DTM(I,K,II)*DLT
-				! IF(II==27 .or. II==35)then
-				! 	if(K==3)then
-				! 		if(NGID(I)==7849) THEN
-				! 			write(*,*)'II = ',II
-				! 			write(*,*)'C1 before assignment = ',C1(I,K,II)
-				! 			write(*,*)'XFLUX before assignment = ',XFLUX(I,K,II)
 
-				! 		endif 
-				! 	endif
-				! endif
-		    ! C2F(I,K,II)=C1(I,K,II)
 			  C2F(I,K,II)=MAX(C1(I,K,II),1.e-15)
-			! IF(II==27 .or. II==35)then
-			! 	if(K==3)then
-			! 		if(NGID(I)==7849) THEN
-			! 			write(*,*)'II = ',II
-			! 	        write(*,*)'C2F after assignment = ',C2F(I,K,II)
-			! 		endif 
-			! 	endif
-			! endif
-            !   C2F(I,K,II) = MAX( C1(I,K,II),  10E-15 )
-			! if(C2F(I,K,II)<=0.)THEN
-			! 	C2F(I,K,II) = 1E-10;
-			! endif
-        !    IF(II.EQ.4.OR.II.EQ.5.OR.II.EQ.6)C2F(I,K,II)=MAX( C1(I,K,II), 0.003)  !make sure there are seeds for ALG1,2 and 3
 
          ENDDO
      ENDDO
@@ -670,44 +639,14 @@
      II = AC(JCON)
        DO K=1,KBM1
 		 DO I=1,MLOC
-			! IF(II==27 .or. II==35)then
-			! 	if(K==3)then
-			! 		if(NGID(I)==7849) THEN
-			! 			write(*,*)'II = ',II
-			! 			write(*,*)'C2F before DTM = ',C2F(I,K,II)
-			! 			write(*,*)'DTM = ',DTM(I,K,II)
-			! 		endif 
-			! 	endif
-			! endif
+
 			 C2F(I,K,II)=C2F(I,K,II) + DTM(I,K,II)*DLT
 			   C2F(I,K,II) = DMAX1 ( C2F(I,K,II), 1.e-15 )
-			! if(C2F(I,K,II)<=0.)THEN
-			! 	C2F(I,K,II) = 1E-10;
-			! endif
-			! IF(II==27 .or. II==35)then
-			! 	if(K==3)then
-			! 		if(NGID(I)==7849) THEN
-			! 			write(*,*)'II = ',II
-            !             write(*,*)'C2F AFTER DTM = ',C2F(I,K,II)
-			! 		endif 
-			! 	endif
-			! endif
-            !       C2F(I,K,II) = MAX( C2F(I,K,II), 10E-15 )
-			! IF(II.EQ.4.OR.II.EQ.5.OR.II.EQ.6)C2F(I,K,II)=MAX( C2F(I,K,II), 0.003)  !make sure there are seeds for ALG1,2 and 3
-               !write(*,*)'C2F after= ',C2F(I,K,II)
 
          ENDDO
        ENDDO
      ENDDO
-!	 IF(MSR)THEN
-!		TOTAL_TIME_PROFILE=TOTAL_TIME_PROFILE+DTIME(ELAPSED_PROFILE)
-!		WRITE(*,'(A24,I5.0,A3,EN15.3,A20)')"Total time used in part ",NPROFILE," = ",TOTAL_TIME_PROFILE," FCTNUT"
-!	 ENDIF
-	 
-!	 IF(MSR)THEN
-!		TOTAL_TIME_PROFILE=DTIME(ELAPSED_PROFILE)
-!		NPROFILE=NPROFILE+1
-!	 ENDIF
+
    IF(NUMPNT > 0) DEALLOCATE(PQDIS, PWQDIS) 
 !   DEALLOCATE (XFLUX)
 !   DEALLOCATE (XFLUX_ADV)
