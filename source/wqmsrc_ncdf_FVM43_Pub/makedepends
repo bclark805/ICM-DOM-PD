@@ -1,0 +1,55 @@
+mod_prec.o : mod_prec.F 
+mod_types.o : mod_types.F mod_prec.o 
+mod_utils.o : mod_utils.F 
+mod_control.o : mod_control.F mod_prec.o 
+mod_lims.o : mod_lims.F 
+mod_bcs.o : mod_bcs.F mod_control.o mod_prec.o mod_types.o 
+mod_sizes.o : mod_sizes.F 
+mod_hydrovars.o : mod_hydrovars.F mod_sizes.o mod_types.o mod_lims.o mod_prec.o 
+mod_buffers.o : mod_buffers.F mod_prec.o 
+mod_fileinfo.o : mod_fileinfo.F mod_sizes.o 
+mod_inp.o : mod_inp.F mod_prec.o mod_utils.o 
+mod_wqm.o : mod_wqm.F mod_buffers.o mod_lims.o mod_prec.o mod_sizes.o 
+mod_zoop.o : mod_zoop.F mod_par.o mod_control.o mod_fileinfo.o mod_wqm.o mod_sizes.o mod_lims.o mod_prec.o 
+mod_wqminit.o : mod_wqminit.F mod_lims.o mod_sizes.o mod_prec.o 
+utilities.o : utilities.F 
+mod_output_flux.o : mod_output_flux.F mod_prec.o mod_par.o mod_wqm.o mod_utils.o mod_control.o 
+mod_par.o : mod_par.F mod_lims.o mod_utils.o mod_wqm.o mod_types.o mod_prec.o 
+mod_sed_sav_exchange_vars.o : mod_sed_sav_exchange_vars.F mod_lims.o mod_prec.o 
+bracket.o : bracket.F mod_types.o mod_prec.o 
+mod_sed_sf_exchange_vars.o : mod_sed_sf_exchange_vars.F mod_lims.o mod_prec.o 
+mod_sf.o : mod_sf.F mod_par.o mod_control.o mod_wqminit.o mod_fileinfo.o mod_hydrovars.o mod_wqm.o mod_sed_sf_exchange_vars.o mod_prec.o mod_lims.o mod_sizes.o 
+mod_sed_df_exchange_vars.o : mod_sed_df_exchange_vars.F mod_lims.o mod_prec.o 
+mod_df.o : mod_df.F mod_sed_df_exchange_vars.o mod_prec.o mod_control.o mod_lims.o mod_sizes.o mod_fileinfo.o mod_wqm.o 
+mod_wc_dom.o : mod_wc_dom.F mod_wqm.o mod_zoop.o mod_sed_dom_exchange.o mod_prec.o mod_control.o mod_par.o mod_hydrovars.o mod_lims.o mod_sizes.o 
+mod_sed_dom_exchange.o : mod_sed_dom_exchange.F mod_prec.o mod_sizes.o mod_lims.o 
+mod_sed_dom.o : mod_sed_dom.F mod_wqm.o mod_prec.o mod_control.o mod_par.o mod_lims.o mod_sizes.o mod_hydrovars.o mod_wc_dom.o mod_sed_dom_exchange.o 
+mod_owq.o : mod_owq.F mod_wc_dom.o mod_zoop.o mod_prec.o mod_par.o mod_control.o mod_fileinfo.o mod_sizes.o mod_lims.o mod_hydrovars.o mod_wqm.o 
+mod_sav.o : mod_sav.F mod_sed_sav_exchange_vars.o mod_owq.o mod_par.o mod_control.o mod_fileinfo.o mod_wqm.o mod_sizes.o mod_lims.o mod_prec.o 
+mod_ba.o : mod_ba.F mod_par.o mod_owq.o mod_control.o mod_hydrovars.o mod_fileinfo.o mod_wqm.o mod_lims.o mod_prec.o 
+mod_sed.o : mod_sed.F mod_sav.o mod_sed_df_exchange_vars.o mod_sed_dom_exchange.o mod_sed_dom.o mod_df.o mod_ba.o mod_sed_sf_exchange_vars.o mod_sf.o mod_control.o mod_hydrovars.o mod_par.o mod_lims.o mod_fileinfo.o mod_wqm.o mod_sizes.o mod_prec.o 
+mod_algal.o : mod_algal.F mod_wc_dom.o mod_par.o mod_zoop.o mod_owq.o mod_control.o mod_hydrovars.o mod_fileinfo.o mod_wqm.o mod_lims.o mod_sizes.o mod_prec.o 
+mod_bcmap.o : mod_bcmap.F mod_par.o mod_control.o mod_lims.o mod_sizes.o mod_types.o mod_prec.o 
+mod_obcs.o : mod_obcs.F mod_hydrovars.o mod_tge.o mod_lims.o mod_bcmap.o mod_prec.o 
+mod_ncd.o : mod_ncd.F mod_prec.o 
+ncdio.o : ncdio.F mod_par.o mod_bcmap.o mod_wqm.o mod_hydrovars.o mod_control.o mod_prec.o mod_sizes.o mod_lims.o mod_ncd.o 
+mod_tge.o : mod_tge.F mod_prec.o mod_bcmap.o mod_par.o mod_control.o mod_hydrovars.o mod_lims.o 
+cell_area.o : cell_area.F mod_par.o mod_control.o mod_hydrovars.o mod_tge.o mod_prec.o mod_lims.o 
+pdomdec.o : pdomdec.F mod_sizes.o mod_par.o mod_control.o mod_hydrovars.o mod_tge.o mod_prec.o mod_lims.o 
+domdec.o : domdec.F mod_hydrovars.o 
+genmap.o : genmap.F mod_par.o mod_sizes.o mod_control.o mod_hydrovars.o mod_lims.o mod_prec.o 
+bcs_force.o : bcs_force.F mod_par.o mod_wqm.o mod_utils.o mod_bcs.o mod_control.o mod_hydrovars.o mod_prec.o mod_lims.o mod_sizes.o 
+wqm_inputs.o : wqm_inputs.F mod_zoop.o mod_par.o mod_sav.o mod_sed.o mod_ba.o mod_algal.o mod_wqminit.o mod_wc_dom.o mod_sed_dom_exchange.o mod_sed_dom.o mod_df.o mod_sf.o mod_owq.o mod_wqm.o mod_control.o mod_hydrovars.o mod_bcmap.o mod_tge.o mod_prec.o mod_sizes.o mod_lims.o mod_fileinfo.o mod_ncdio_new_BC.o 
+mod_kin.o : mod_kin.F mod_wqminit.o mod_sav.o mod_wc_dom.o mod_hydrovars.o mod_lims.o mod_wqm.o mod_sed_dom.o mod_zoop.o mod_par.o mod_prec.o 
+tvds.o : tvds.F mod_par.o mod_sav.o mod_fileinfo.o mod_control.o mod_hydrovars.o mod_wqm.o mod_sizes.o mod_lims.o mod_prec.o 
+adv_wqm.o : adv_wqm.F mod_par.o mod_bcs.o mod_wqminit.o mod_sed_dom.o mod_wqm.o mod_control.o mod_hydrovars.o mod_tge.o mod_prec.o mod_lims.o mod_output_flux.o 
+vdif_wqm.o : vdif_wqm.F mod_wqm.o mod_sizes.o mod_hydrovars.o mod_tge.o mod_lims.o mod_prec.o 
+vertvl.o : vertvl.F mod_wqm.o mod_hydrovars.o mod_tge.o mod_lims.o mod_prec.o 
+viscofh.o : viscofh.F mod_prec.o mod_hydrovars.o mod_tge.o mod_lims.o 
+bcond_wqm.o : bcond_wqm.F mod_obcs.o mod_wqm.o mod_bcs.o mod_control.o mod_hydrovars.o mod_bcmap.o mod_tge.o mod_lims.o mod_prec.o mod_sizes.o 
+fct_nut.o : fct_nut.F mod_bcmap.o mod_prec.o mod_wqm.o mod_bcs.o mod_control.o mod_hydrovars.o mod_tge.o mod_lims.o 
+mod_filenames.o : mod_filenames.F 
+dens2.o : dens2.F mod_sed_dom.o mod_prec.o mod_hydrovars.o mod_wqm.o mod_lims.o 
+mod_ncdio_new_BC.o : mod_ncdio_new_BC.F mod_ncd.o mod_df.o mod_buffers.o mod_filenames.o mod_fileinfo.o mod_bcmap.o mod_utils.o mod_types.o mod_par.o mod_owq.o mod_sed_dom.o mod_sed.o mod_wc_dom.o mod_wqm.o mod_tge.o mod_lims.o mod_sizes.o mod_prec.o mod_hydrovars.o mod_control.o mod_inp.o 
+mod_hydro.o : mod_hydro.F mod_buffers.o mod_types.o mod_bcmap.o mod_par.o mod_wqm.o mod_ncdio_new_BC.o mod_sizes.o mod_lims.o mod_control.o mod_hydrovars.o mod_prec.o 
+wqm_main.o : wqm_main.F mod_ncdio_new_BC.o mod_wc_dom.o mod_sed_dom_exchange.o mod_sed_dom.o mod_df.o mod_buffers.o mod_filenames.o mod_par.o mod_sav.o mod_bcs.o mod_obcs.o mod_ba.o mod_sed_sav_exchange_vars.o mod_sed_sf_exchange_vars.o mod_sed_df_exchange_vars.o mod_sed.o mod_kin.o mod_zoop.o mod_algal.o mod_wqminit.o mod_owq.o mod_wqm.o mod_sf.o mod_fileinfo.o mod_control.o mod_bcmap.o mod_hydrovars.o mod_tge.o mod_lims.o mod_sizes.o mod_prec.o mod_output_flux.o 
