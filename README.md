@@ -29,5 +29,7 @@ Chen, C., Liu, H., & Beardsley, R. C. (2003). An Unstructured Grid, Finite-Volum
 
 Kim, T., & Khangaonkar, T. (2012). An offline unstructured biogeochemical model (UBM) for complex estuarine and coastal environments. Environmental Modelling and Software, 31, 47–63.
 
+November 2022 Code has been updated to run with FVCOM4.3 with many code modifications, bug fixes, and additions to run the code efficiently on a supercomputer. THe new code is in the wqmsrc_source_FVM43_Pub directory.
+
 
 
